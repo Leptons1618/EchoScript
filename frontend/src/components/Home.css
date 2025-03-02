@@ -123,3 +123,12 @@
   color: #6b7280;
   line-height: 1.5;
 }
+
+/* Update config button icon color for light/dark themes */
+.config-button {
+    color: #1f2937; /* dark text for light mode */
+}
+
+body.dark .config-button {
+    color: #f9fafb; /* light text for dark mode */
+}

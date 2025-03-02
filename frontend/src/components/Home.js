@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Home.css';
+import cogGif from '../assets/icons8-cog.gif';
 
 const Home = () => {
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -159,9 +160,14 @@ const Home = () => {
               onClick={() => setShowConfig(true)}
               disabled={isSubmitting}
               title="Configure Model"
-              style={{ marginLeft: '8px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'inherit' }}
+              style={{ marginLeft: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             >
-              ⚙️
+              <img 
+                src={cogGif}
+                alt="Configure" 
+                className="config-icon" 
+                style={{ width: '24px', height: '24px' }}
+              />
             </button>
           </div>
           {error && <p className="error-message">{error}</p>}
