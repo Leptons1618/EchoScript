@@ -13,12 +13,37 @@ from transformers import pipeline
 from nltk.tokenize import sent_tokenize
 import nltk
 import threading
+import logging
+import datetime
 
-# Download required NLTK data
+# Add LOG_DIR configuration to save log files per session
+LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+log_filename = os.path.join(LOG_DIR, f"session_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+# Set up logging to output to terminal and save logs in separate files per session
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_filename)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Download required NLTK data for 'punkt' and 'punkt_tab'
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
     nltk.download('punkt')
+    logger.info("Downloaded NLTK resource: punkt")
+
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab')
+    logger.info("Downloaded NLTK resource: punkt_tab")
 
 app = Flask(__name__, static_folder='../frontend/build')
 CORS(app)
@@ -33,14 +58,14 @@ for directory in [AUDIO_DIR, TRANSCRIPT_DIR, NOTES_DIR]:
     os.makedirs(directory, exist_ok=True)
 
 # Load Whisper model once at startup - using medium for balance of accuracy and speed
-print("Loading Whisper model...")
+logger.info("Loading Whisper model...")
 transcription_model = whisper.load_model("medium")
-print("Whisper model loaded")
+logger.info("Whisper model loaded")
 
 # Load summarization model
-print("Loading summarization model...")
+logger.info("Loading summarization model...")
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-print("Summarization model loaded")
+logger.info("Summarization model loaded")
 
 # Track jobs
 active_jobs = {}
@@ -51,9 +76,11 @@ def transcribe_video():
     data = request.json
     youtube_url = data.get('youtube_url')
     if not youtube_url:
+        logger.warning("No YouTube URL provided")
         return jsonify({"error": "No YouTube URL provided"}), 400
-    
+
     job_id = str(uuid.uuid4())
+    logger.info(f"Job {job_id} created for URL: {youtube_url}")
     
     # Start processing in a new thread
     thread = threading.Thread(target=process_video, args=(youtube_url, job_id))
@@ -73,6 +100,7 @@ def process_video(youtube_url, job_id):
             if job_id not in active_jobs:
                 active_jobs[job_id] = {"url": youtube_url, "created_at": time.time()}
             active_jobs[job_id]["status"] = "downloading"
+        logger.info(f"Job {job_id}: Downloading audio...")
         
         # Download audio
         audio_path = download_youtube_audio(youtube_url, job_id)
@@ -80,6 +108,7 @@ def process_video(youtube_url, job_id):
         with jobs_lock:
             active_jobs[job_id]["status"] = "transcribing"
             active_jobs[job_id]["audio_path"] = audio_path
+        logger.info(f"Job {job_id}: Audio downloaded to {audio_path}. Transcribing...")
         
         # Transcribe audio
         transcript, segments = transcribe_audio(audio_path)
@@ -102,6 +131,7 @@ def process_video(youtube_url, job_id):
         transcript_path = os.path.join(TRANSCRIPT_DIR, f"{job_id}.json")
         with open(transcript_path, 'w') as f:
             json.dump(transcript_data, f)
+        logger.info(f"Job {job_id}: Transcript saved at {transcript_path}")
         
         with jobs_lock:
             active_jobs[job_id]["status"] = "generating_notes"
@@ -113,6 +143,7 @@ def process_video(youtube_url, job_id):
         notes_path = os.path.join(NOTES_DIR, f"{job_id}.json")
         with open(notes_path, 'w') as f:
             json.dump(notes, f)
+        logger.info(f"Job {job_id}: Notes saved at {notes_path}")
         
         with jobs_lock:
             active_jobs[job_id]["status"] = "complete"
@@ -120,6 +151,7 @@ def process_video(youtube_url, job_id):
             active_jobs[job_id]["title"] = transcript_data["title"]
             active_jobs[job_id]["channel"] = transcript_data["channel"]
             active_jobs[job_id]["thumbnail"] = info.get('thumbnail', '')
+        logger.info(f"Job {job_id}: Processing complete")
     
     except Exception as e:
         with jobs_lock:
@@ -127,9 +159,10 @@ def process_video(youtube_url, job_id):
                 active_jobs[job_id] = {"url": youtube_url, "created_at": time.time()}
             active_jobs[job_id]["status"] = "error"
             active_jobs[job_id]["error"] = str(e)
+        logger.error(f"Job {job_id}: Error occurred - {str(e)}", exc_info=True)
 
 def download_youtube_audio(youtube_url, job_id):
-    """Download YouTube video audio using yt-dlp"""
+    logger.info(f"Job {job_id}: Starting audio download using yt-dlp")
     output_template = os.path.join(AUDIO_DIR, f"{job_id}.%(ext)s")
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -143,19 +176,21 @@ def download_youtube_audio(youtube_url, job_id):
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([youtube_url])
-    
+    logger.info(f"Job {job_id}: Audio downloaded successfully")
     return os.path.join(AUDIO_DIR, f"{job_id}.mp3")
 
 def transcribe_audio(audio_path):
-    """Transcribe audio using Whisper"""
+    logger.info(f"Transcribing audio from {audio_path}")
     import os
     if not os.path.exists(audio_path):
+        logger.error(f"Audio file not found: {audio_path}")
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
     result = transcription_model.transcribe(audio_path)
+    logger.info("Transcription complete")
     return result["text"], result["segments"]
 
 def generate_notes(transcript):
-    """Generate notes from the transcript"""
+    logger.info("Generating notes from transcript")
     # Split into chunks to process with BART
     sentences = sent_tokenize(transcript)
     chunks = []
@@ -194,23 +229,30 @@ def generate_notes(transcript):
         "key_points": key_points,
         "original_transcript": transcript
     }
-    
+    logger.info("Notes generated successfully")
     return notes
 
 @app.route('/api/job/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     if job_id not in active_jobs:
-        # Check if job info exists from a previous run via the transcript file
         transcript_path = os.path.join(TRANSCRIPT_DIR, f"{job_id}.json")
         notes_path = os.path.join(NOTES_DIR, f"{job_id}.json")
         if os.path.exists(transcript_path):
+            try:
+                with open(transcript_path, 'r') as f:
+                    data = json.load(f)
+                title = data.get("title", "Unknown Video")
+                channel = data.get("channel", "Unknown")
+            except Exception:
+                title = "Unknown Video"
+                channel = "Unknown"
             job_info = {
                 "job_id": job_id,
                 "status": "complete",
                 "transcript_path": transcript_path,
                 "notes_path": notes_path,
-                "title": "Unknown Video",
-                "channel": "Unknown",
+                "title": title,
+                "channel": channel,
                 "created_at": os.path.getmtime(transcript_path)
             }
             return jsonify(job_info)
@@ -294,4 +336,5 @@ def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    logger.info("Starting Flask server on 0.0.0.0:5000")
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)

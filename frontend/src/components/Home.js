@@ -99,6 +99,17 @@ const Home = () => {
           </div>
         </div>
       </div>
+      
+      {/* New About Section */}
+      <div className="about-section" style={{ padding: '20px', textAlign: 'center', backgroundColor: '#f3f4f6', borderRadius: '12px', marginTop: '20px' }}>
+        <h2>About</h2>
+        <p>YT Transcriber Pro is developed by Lept0n5.</p>
+        <div className="social-links" style={{ display: 'flex', justifyContent: 'center', gap: '20px', fontSize: '1.2rem' }}>
+          <a href="https://www.linkedin.com/in/your-linkedin" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a href="https://github.com/your-github" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="mailto:your-email@example.com">Email Me</a>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 // src/components/TranscriptionView.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import './TranscriptionView.css';
 import { jsPDF } from "jspdf";
@@ -11,6 +11,18 @@ const TranscriptionView = () => {
   const [notes, setNotes] = useState(null);
   const [activeTab, setActiveTab] = useState('transcript');
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [logs, setLogs] = useState([]);
+  const prevStatusRef = useRef('');
+  
+  // Determine target progress based on status
+  const getTargetProgress = (status) => {
+    if (status === 'downloading') return 25;
+    if (status === 'transcribing') return 60;
+    if (status === 'generating_notes') return 90;
+    if (status === 'complete') return 100;
+    return 0;
+  };
   
   useEffect(() => {
     // Poll job status
@@ -71,6 +83,26 @@ const TranscriptionView = () => {
     return () => clearInterval(interval);
   }, [jobId, jobStatus.status]);
   
+  // Timer to update progress gradually until target progress is reached
+  useEffect(() => {
+    const target = getTargetProgress(jobStatus.status);
+    const timer = setInterval(() => {
+      setProgress(prev => {
+        if (prev < target) return Math.min(prev + 2, target);
+        return prev;
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [jobStatus.status]);
+  
+  // Log status changes for background display
+  useEffect(() => {
+    if (prevStatusRef.current !== jobStatus.status) {
+      setLogs(prev => [...prev, `Status changed to: ${jobStatus.status}`]);
+      prevStatusRef.current = jobStatus.status;
+    }
+  }, [jobStatus.status]);
+  
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
@@ -119,7 +151,7 @@ const TranscriptionView = () => {
       <div className="processing-status">
         <div className="status-indicator">
           <div className={`status-icon ${jobStatus.status}`}></div>
-          <div className="status-text">{statusMessages[jobStatus.status] || jobStatus.status}</div>
+          <div className="status-text">{statusMessages[jobStatus.status] || jobStatus.status} ({progress}%)</div>
         </div>
         {jobStatus.status !== "complete" && jobStatus.status !== "error" && (
           <div className="progress-bar-container">
@@ -127,14 +159,7 @@ const TranscriptionView = () => {
               <div
                 className="progress-fill"
                 style={{
-                  width:
-                    jobStatus.status === "downloading"
-                      ? "25%"
-                      : jobStatus.status === "transcribing"
-                      ? "60%"
-                      : jobStatus.status === "generating_notes"
-                      ? "90%"
-                      : "0%"
+                  width: `${progress}%`
                 }}
               ></div>
             </div>
@@ -235,6 +260,23 @@ const TranscriptionView = () => {
           )}
         </>
       )}
+      {/* Small log-display */}
+      <div className="log-display" style={{
+        marginTop: '20px',
+        fontSize: '0.8rem',
+        color: '#666',
+        background: '#f9f9f9',
+        padding: '10px',
+        borderRadius: '6px',
+        maxHeight: '150px',
+        overflowY: 'auto'
+      }}>
+        {logs.map((msg, index) => <div key={index}>{msg}</div>)}
+      </div>
+      {/* Footer */}
+      <footer style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.9rem', color: '#6b7280' }}>
+        Created by Lept0n5
+      </footer>
     </div>
   );
 };
