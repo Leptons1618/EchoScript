@@ -23,6 +23,13 @@ Thumbs.db
 # Environment variables
 .venv/
 
+# Models, downloads, etc directory
+models/
+downloads/
+logs/
+transcripts/
+notes/
+
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies

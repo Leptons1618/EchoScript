@@ -1,8 +1,8 @@
 // src/components/TranscriptionView.js
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import './TranscriptionView.css';
 import { jsPDF } from "jspdf";
+import './TranscriptionView.css';
 
 const TranscriptionView = () => {
   const { jobId } = useParams();
@@ -17,11 +17,13 @@ const TranscriptionView = () => {
   
   // Determine target progress based on status
   const getTargetProgress = (status) => {
-    if (status === 'downloading') return 25;
-    if (status === 'transcribing') return 60;
-    if (status === 'generating_notes') return 90;
-    if (status === 'complete') return 100;
-    return 0;
+    switch(status) {
+      case 'downloading': return 20;
+      case 'transcribing': return 90;  // heavy phase gets more range
+      case 'generating_notes': return 100;
+      case 'complete': return 100;
+      default: return 0;
+    }
   };
   
   useEffect(() => {
@@ -86,9 +88,11 @@ const TranscriptionView = () => {
   // Timer to update progress gradually until target progress is reached
   useEffect(() => {
     const target = getTargetProgress(jobStatus.status);
+    // Use a lower increment during transcription for smoothness, higher for others
+    const increment = jobStatus.status === 'transcribing' ? 1 : 4;
     const timer = setInterval(() => {
       setProgress(prev => {
-        if (prev < target) return Math.min(prev + 2, target);
+        if (prev < target) return Math.min(prev + increment, target);
         return prev;
       });
     }, 500);
@@ -260,19 +264,21 @@ const TranscriptionView = () => {
           )}
         </>
       )}
-      {/* Small log-display */}
-      <div className="log-display" style={{
-        marginTop: '20px',
-        fontSize: '0.8rem',
-        color: '#666',
-        background: '#f9f9f9',
-        padding: '10px',
-        borderRadius: '6px',
-        maxHeight: '150px',
-        overflowY: 'auto'
-      }}>
-        {logs.map((msg, index) => <div key={index}>{msg}</div>)}
-      </div>
+      {/* Conditionally render log-display only when not complete and not error */}
+      {jobStatus.status !== 'complete' && jobStatus.status !== 'error' && (
+        <div className="log-display" style={{
+          marginTop: '20px',
+          fontSize: '0.8rem',
+          color: '#666',
+          background: '#f9f9f9',
+          padding: '10px',
+          borderRadius: '6px',
+          maxHeight: '150px',
+          overflowY: 'auto'
+        }}>
+          {logs.map((msg, index) => <div key={index}>{msg}</div>)}
+        </div>
+      )}
       {/* Footer */}
       <footer style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.9rem', color: '#6b7280' }}>
         Created by Lept0n5

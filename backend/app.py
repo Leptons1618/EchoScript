@@ -1,20 +1,26 @@
 # Backend: Flask application with transcription and summarization
 
 # app.py
+
+# Standard Libraries
+import datetime
+import json
+import logging
+import os
+import threading
+import time
+import uuid
+os.environ["CTRANSLATE2_DISABLE_EXECSTACK"] = "1"  # Disable executable stack for CTranslate2
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+# Third-Party Libraries
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import yt_dlp
-import whisper
-import os
-import json
-import uuid
-import time
-from transformers import pipeline
-from nltk.tokenize import sent_tokenize
 import nltk
-import threading
-import logging
-import datetime
+from nltk.tokenize import sent_tokenize
+import whisper
+import yt_dlp
+from transformers import pipeline
 
 # Add LOG_DIR configuration to save log files per session
 LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
@@ -52,24 +58,22 @@ CORS(app)
 AUDIO_DIR = 'downloads'
 TRANSCRIPT_DIR = 'transcripts'
 NOTES_DIR = 'notes'
+MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
+os.makedirs(MODEL_DIR, exist_ok=True)
 
 # Ensure directories exist
-for directory in [AUDIO_DIR, TRANSCRIPT_DIR, NOTES_DIR]:
+for directory in [AUDIO_DIR, TRANSCRIPT_DIR, NOTES_DIR, MODEL_DIR]:
     os.makedirs(directory, exist_ok=True)
 
-# Load Whisper model once at startup - using medium for balance of accuracy and speed
-logger.info("Loading Whisper model...")
-transcription_model = whisper.load_model("medium")
-logger.info("Whisper model loaded")
-
-# Load summarization model
-logger.info("Loading summarization model...")
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-logger.info("Summarization model loaded")
+transcription_model = None  # No model loaded on startup
+current_whisper_model_size = None
+summarizer = None   # Added global summarizer variable
 
 # Track jobs
 active_jobs = {}
 jobs_lock = threading.Lock()
+
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_video():
@@ -79,18 +83,25 @@ def transcribe_video():
         logger.warning("No YouTube URL provided")
         return jsonify({"error": "No YouTube URL provided"}), 400
 
+    # Read additional config options
+    model_type = data.get('model_type', 'whisper')
+    model_size = data.get('model_size', 'medium')
+    
     job_id = str(uuid.uuid4())
-    logger.info(f"Job {job_id} created for URL: {youtube_url}")
+    logger.info(f"Job {job_id} created for URL: {youtube_url} using {model_type} ({model_size})")
+    
+    # Store config in job details
+    active_jobs[job_id] = {
+        "status": "downloading",
+        "url": youtube_url,
+        "created_at": time.time(),
+        "model_type": model_type,
+        "model_size": model_size
+    }
     
     # Start processing in a new thread
     thread = threading.Thread(target=process_video, args=(youtube_url, job_id))
     thread.start()
-    
-    active_jobs[job_id] = {
-        "status": "downloading",
-        "url": youtube_url,
-        "created_at": time.time()
-    }
     
     return jsonify({"job_id": job_id, "status": "processing"})
 
@@ -102,7 +113,6 @@ def process_video(youtube_url, job_id):
             active_jobs[job_id]["status"] = "downloading"
         logger.info(f"Job {job_id}: Downloading audio...")
         
-        # Download audio
         audio_path = download_youtube_audio(youtube_url, job_id)
         
         with jobs_lock:
@@ -110,8 +120,12 @@ def process_video(youtube_url, job_id):
             active_jobs[job_id]["audio_path"] = audio_path
         logger.info(f"Job {job_id}: Audio downloaded to {audio_path}. Transcribing...")
         
-        # Transcribe audio
-        transcript, segments = transcribe_audio(audio_path)
+        # Retrieve configuration for model
+        model_type = active_jobs[job_id].get("model_type", "whisper")
+        model_size = active_jobs[job_id].get("model_size", "medium")
+        
+        # Transcribe audio based on selected model
+        transcript, segments = transcribe_audio(audio_path, model_type, model_size)
         
         # Get video metadata BEFORE saving transcript
         ydl_opts = {
@@ -179,23 +193,42 @@ def download_youtube_audio(youtube_url, job_id):
     logger.info(f"Job {job_id}: Audio downloaded successfully")
     return os.path.join(AUDIO_DIR, f"{job_id}.mp3")
 
-def transcribe_audio(audio_path):
-    logger.info(f"Transcribing audio from {audio_path}")
+def get_model_path(model_type):
+    base = os.path.join(os.path.dirname(__file__), "models")
+    path = os.path.join(base, model_type)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
+    global transcription_model, current_whisper_model_size
+    logger.info(f"Transcribing audio with {model_type} model ({model_size}) from {audio_path}")
     import os
     if not os.path.exists(audio_path):
         logger.error(f"Audio file not found: {audio_path}")
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
-    result = transcription_model.transcribe(audio_path)
-    logger.info("Transcription complete")
+    if model_type == "faster-whisper":
+        from faster_whisper import WhisperModel
+        model_path = get_model_path("faster-whisper")
+        logger.info(f"Loading Faster-Whisper {model_size} model from {model_path}...")
+        faster_model = WhisperModel(model_size, device="cuda", compute_type="float16", download_root=model_path)
+        result = faster_model.transcribe(audio_path)
+        logger.info("Faster-Whisper transcription complete")
+    else:
+        # For Whisper:
+        if transcription_model is None:
+            errorMsg = "No Whisper model loaded. Please configure and load a model first."
+            logger.error(errorMsg)
+            raise Exception(errorMsg)
+        # Use the already loaded model without reloading.
+        result = transcription_model.transcribe(audio_path)
+        logger.info("Whisper transcription complete")
     return result["text"], result["segments"]
 
 def generate_notes(transcript):
     logger.info("Generating notes from transcript")
-    # Split into chunks to process with BART
     sentences = sent_tokenize(transcript)
     chunks = []
     current_chunk = ""
-    
     # Create chunks of roughly 1000 characters for summarization
     for sentence in sentences:
         if len(current_chunk) + len(sentence) < 1000:
@@ -203,27 +236,18 @@ def generate_notes(transcript):
         else:
             chunks.append(current_chunk.strip())
             current_chunk = sentence
-    
     if current_chunk:
         chunks.append(current_chunk.strip())
-    
-    # Process each chunk
     summaries = []
     for chunk in chunks:
         if len(chunk) < 50:  # Skip very short chunks
             continue
-        
-        # Generate summary
         summary = summarizer(chunk, max_length=100, min_length=30, do_sample=False)
         summaries.append(summary[0]['summary_text'])
-    
-    # Extract key points
     key_points = []
     for summary in summaries:
         points = sent_tokenize(summary)
         key_points.extend(points)
-    
-    # Create structured notes
     notes = {
         "summary": " ".join(summaries),
         "key_points": key_points,
@@ -231,6 +255,56 @@ def generate_notes(transcript):
     }
     logger.info("Notes generated successfully")
     return notes
+
+@app.route('/api/load_model', methods=['POST'])
+def load_model_config():
+    data = request.json
+    model_type = data.get('model_type', 'whisper')
+    model_size = data.get('model_size', 'medium')
+    # Save config first before PyTorch operations
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump({"model_type": model_type, "model_size": model_size}, f)
+    global transcription_model, current_whisper_model_size, summarizer
+    if model_type == "whisper":
+        if 'transcription_model' in globals() and transcription_model is not None:
+            logger.info("Disallocating current Whisper model...")
+            del transcription_model
+            import gc; gc.collect()
+            import torch
+            torch.cuda.empty_cache()
+            time.sleep(2)  # Allow GPU memory to release
+            logger.info("CUDA memory after empty_cache: allocated=%s, reserved=%s" % (torch.cuda.memory_allocated(), torch.cuda.memory_reserved()))
+        logger.info(f"Loading Whisper {model_size} model as per configuration...")
+        model_path = get_model_path("whisper")
+        transcription_model = whisper.load_model(model_size, download_root=model_path)
+        current_whisper_model_size = model_size
+        # Load summarization model after loading Whisper
+        logger.info("Loading summarization model: facebook/bart-large-cnn...")
+        summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+        if summarizer is not None:
+            logger.info("Summarization model loaded successfully: facebook/bart-large-cnn")
+        else:
+            logger.error("Failed to load summarization model: facebook/bart-large-cnn")
+        logger.info(f"Completed loading Whisper {model_size} model and summarization model")
+    elif model_type == "faster-whisper":
+        from faster_whisper import WhisperModel
+        model_path = get_model_path("faster-whisper")
+        _ = WhisperModel(model_size, device="cuda", compute_type="float16", download_root=model_path)
+        logger.info(f"Completed loading Faster-Whisper {model_size} model")
+    else:
+        return jsonify({"error": "Invalid model type"}), 400
+    return jsonify({"message": f"{model_type.capitalize()} model {model_size} loaded"}), 200
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'r') as f:
+            config = json.load(f)
+    else:
+        config = {"model_type": "whisper", "model_size": "medium"}
+    # Add model_status to indicate whether a model is loaded
+    config["model_status"] = "loaded" if transcription_model is not None else "no model loaded"
+    return jsonify(config), 200
 
 @app.route('/api/job/<job_id>', methods=['GET'])
 def get_job_status(job_id):
