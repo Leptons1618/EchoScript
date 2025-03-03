@@ -197,11 +197,8 @@ youtube-transcriber/
 2. **/api/job/<job_id>:** GET request to retrieve job status and results
 3. ...
 
-## Demonstration Video
+[## Demonstration Video](https://github.com/Leptons1618/YT_Transcriber/blob/master/YT_Transcriber_Demo.mkv)
 
-[YouTube Video Transcriber Demo](https://github.com/Leptons1618/YT_Transcriber/blob/master/YT_Transcriber_Demo.mkv)
-
-Here's the embedded video:
 <video width="320" height="240" controls
   src="https://github.com/Leptons1618/YT_Transcriber/blob/master/YT_Transcriber_Demo.mkv" type="video/mkv">
 </video>
