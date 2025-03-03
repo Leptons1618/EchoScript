@@ -146,6 +146,11 @@ gunicorn -w 4 app:app
 5. Set up Nginx as a reverse proxy
 
 ## Folder Structure
+## Project Folder Structure
+
+Below is an overview of the folder structure for the YouTube Video Transcriber project:
+
+```
 youtube-transcriber/
 ├── backend/
 │   ├── app.py                 # Main Flask application
@@ -158,23 +163,24 @@ youtube-transcriber/
 │   ├── notes/                 # Generated notes storage
 │   └── transcripts/           # Generated transcripts storage
 └── frontend/
-    ├── public/                # Static assets
-    └── src/
-        ├── assets/            # Images and icons
-        │   └── icons8-cog.gif # Settings icon
-        ├── components/
-        │   ├── Home.js        # Landing page component
-        │   ├── Home.css       # Landing page styles
-        │   ├── Navbar.js      # Navigation component
-        │   ├── Navbar.css     # Navigation styles
-        │   ├── TranscriptionView.js # Transcript/video viewer
-        │   ├── TranscriptionView.css # Transcript/video styles
-        │   ├── JobsList.js    # Job history component
-        │   └── JobsList.css   # Job history styles
-        ├── App.js             # Main application component
-        ├── App.css            # Main application styles
-        ├── index.js           # Application entry point
-        └── index.css          # Global styles
+  ├── public/                # Static assets
+  └── src/
+    ├── assets/            # Images and icons
+    │   └── icons8-cog.gif  # Settings icon
+    ├── components/        # React components
+    │   ├── Home.js        # Landing page component
+    │   ├── Home.css       # Landing page styles
+    │   ├── Navbar.js      # Navigation component
+    │   ├── Navbar.css     # Navigation styles
+    │   ├── TranscriptionView.js  # Transcript and video viewer
+    │   ├── TranscriptionView.css # Transcript and video styles
+    │   ├── JobsList.js    # Job history component
+    │   └── JobsList.css   # Job history styles
+    ├── App.js             # Main application component
+    ├── App.css            # Main application styles
+    ├── index.js           # Application entry point
+    └── index.css          # Global styles
+```
 
 ## Component Structure
 
