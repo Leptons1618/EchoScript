@@ -196,3 +196,7 @@ youtube-transcriber/
 1. **/api/transcribe:** POST request to transcribe a YouTube video
 2. **/api/job/<job_id>:** GET request to retrieve job status and results
 3. ...
+
+## Demonstration Video
+
+[YouTube Video Transcriber Demo](https://www.youtube.com/watch?v=1234567890)
