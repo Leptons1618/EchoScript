@@ -99,24 +99,25 @@ const Home = () => {
   const renderModelStatus = () => {
     if (modelLoadStatus === "loading") {
       return (
-        <div className="model-status" style={{ fontSize: '0.85rem', color: '#4b5563', marginTop: '4px', display: 'flex', alignItems: 'center' }}>
-          <span className="spinner" style={{
-            width: '16px',
-            height: '16px',
-            border: '2px solid rgba(0,0,0,0.1)',
-            borderTop: '2px solid #4f46e5',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            marginRight: '8px'
-          }}></span>
-          <span>Loading model: {modelType} ({modelSize})</span>
+        <div className="model-status-container">
+          <div className="spinner-container">
+            <div className="status-spinner"></div>
+          </div>
+          <span className="status-text">Loading model: {modelType} ({modelSize})</span>
         </div>
       );
     } else if (modelLoadStatus === "loaded") {
       return (
-        <div className="model-status" style={{ fontSize: '0.85rem', color: '#4b5563', marginTop: '4px', display: 'flex', alignItems: 'center' }}>
-          <span style={{ fontSize: '16px', marginRight: '8px' }}>✔️</span>
-          <span>Loaded: {modelType} ({modelSize})</span>
+        <div className="model-status-container">
+          <div className="status-icon-success">✓</div>
+          <span className="status-text">Loaded: {modelType} ({modelSize})</span>
+        </div>
+      );
+    } else if (modelLoadStatus === "no model loaded") {
+      return (
+        <div className="model-status-container">
+          <div className="status-icon-warning">!</div>
+          <span className="status-text">No model loaded. Click ⚙️ to configure.</span>
         </div>
       );
     }
@@ -203,13 +204,12 @@ const Home = () => {
         </div>
       </div>
 
-      {/* New About Section with reduced font sizes */}
+      {/* About Section - remove the backgroundColor from inline styles */}
       <div
         className="about-section"
         style={{
           padding: '20px',
           textAlign: 'center',
-          backgroundColor: '#f3f4f6',
           borderRadius: '12px',
           marginTop: '20px',
           fontSize: '0.8rem' // Reduced overall font size for the about section
@@ -258,47 +258,33 @@ const Home = () => {
           alignItems: 'center',
           zIndex: 1000
         }}>
-          <div style={{
+          <div className="config-modal-content" style={{
             background: 'white',
             padding: '30px',
             borderRadius: '12px',
-            width: modelType === 'whisper' ? '480px' : '320px',  // Increase width for whisper
+            width: '480px',  // Same width for both model types
             boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
             textAlign: 'center'
           }}>
             <h2 style={{ fontSize: '1.3rem', marginBottom: '20px' }}>Model Configuration</h2>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ marginRight: '10px', fontSize: '0.9rem' }}>Type:</label>
+            <div style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <label style={{ marginRight: '10px', fontSize: '0.9rem', minWidth: '40px' }}>Type:</label>
               <select 
                 value={modelType} 
                 onChange={(e) => {
                   setModelType(e.target.value);
                   setModelSize("tiny"); // Reset size on type change
-                }} 
-                style={{ 
-                  fontSize: '0.9rem', 
-                  padding: '6px 8px', 
-                  border: '1px solid #ddd', 
-                  borderRadius: '4px',
-                  backgroundColor: 'white'
                 }}
               >
                 <option value="whisper">Whisper</option>
                 <option value="faster-whisper">Faster-Whisper</option>
               </select>
             </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ marginRight: '10px', fontSize: '0.9rem' }}>Size:</label>
+            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <label style={{ marginRight: '10px', fontSize: '0.9rem', minWidth: '40px' }}>Size:</label>
               <select 
                 value={modelSize} 
-                onChange={(e) => setModelSize(e.target.value)} 
-                style={{ 
-                  fontSize: '0.9rem', 
-                  padding: '6px 8px', 
-                  border: '1px solid #ddd', 
-                  borderRadius: '4px',
-                  backgroundColor: 'white'
-                }}
+                onChange={(e) => setModelSize(e.target.value)}
               >
                 {modelType === 'faster-whisper' ? (
                   <>
@@ -320,71 +306,76 @@ const Home = () => {
                 )}
               </select>
             </div>
-            {modelType === 'whisper' ? (
-              <div style={{ marginBottom: '20px', maxHeight: '150px', overflowY: 'auto', fontSize: '0.8rem', textAlign: 'left' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
+            <div style={{ marginBottom: '20px', maxHeight: '150px', overflowY: 'auto', fontSize: '0.8rem', textAlign: 'left' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Size</th>
+                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Params</th>
+                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Eng-only</th>
+                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Multi</th>
+                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>VRAM</th>
+                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Speed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ padding: '4px' }}>tiny</td>
+                    <td style={{ padding: '4px' }}>39M</td>
+                    <td style={{ padding: '4px' }}>tiny.en</td>
+                    <td style={{ padding: '4px' }}>tiny</td>
+                    <td style={{ padding: '4px' }}>~1GB</td>
+                    <td style={{ padding: '4px' }}>~10x</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '4px' }}>base</td>
+                    <td style={{ padding: '4px' }}>74M</td>
+                    <td style={{ padding: '4px' }}>base.en</td>
+                    <td style={{ padding: '4px' }}>base</td>
+                    <td style={{ padding: '4px' }}>~1GB</td>
+                    <td style={{ padding: '4px' }}>~7x</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '4px' }}>small</td>
+                    <td style={{ padding: '4px' }}>244M</td>
+                    <td style={{ padding: '4px' }}>small.en</td>
+                    <td style={{ padding: '4px' }}>small</td>
+                    <td style={{ padding: '4px' }}>~2GB</td>
+                    <td style={{ padding: '4px' }}>~4x</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '4px' }}>medium</td>
+                    <td style={{ padding: '4px' }}>769M</td>
+                    <td style={{ padding: '4px' }}>medium.en</td>
+                    <td style={{ padding: '4px' }}>medium</td>
+                    <td style={{ padding: '4px' }}>~5GB</td>
+                    <td style={{ padding: '4px' }}>~2x</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '4px' }}>turbo</td>
+                    <td style={{ padding: '4px' }}>809M</td>
+                    <td style={{ padding: '4px' }}>N/A</td>
+                    <td style={{ padding: '4px' }}>turbo</td>
+                    <td style={{ padding: '4px' }}>~6GB</td>
+                    <td style={{ padding: '4px' }}>~8x</td>
+                  </tr>
+                  {modelType === 'faster-whisper' && (
                     <tr>
-                      <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Size</th>
-                      <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Params</th>
-                      <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Eng-only</th>
-                      <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Multi</th>
-                      <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>VRAM</th>
-                      <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Speed</th>
+                      <td style={{ padding: '4px' }}>large</td>
+                      <td style={{ padding: '4px' }}>1550M</td>
+                      <td style={{ padding: '4px' }}>large-v3</td>
+                      <td style={{ padding: '4px' }}>large-v3</td>
+                      <td style={{ padding: '4px' }}>~10GB</td>
+                      <td style={{ padding: '4px' }}>~1x</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={{ padding: '4px' }}>tiny</td>
-                      <td style={{ padding: '4px' }}>39M</td>
-                      <td style={{ padding: '4px' }}>tiny.en</td>
-                      <td style={{ padding: '4px' }}>tiny</td>
-                      <td style={{ padding: '4px' }}>~1GB</td>
-                      <td style={{ padding: '4px' }}>~10x</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '4px' }}>base</td>
-                      <td style={{ padding: '4px' }}>74M</td>
-                      <td style={{ padding: '4px' }}>base.en</td>
-                      <td style={{ padding: '4px' }}>base</td>
-                      <td style={{ padding: '4px' }}>~1GB</td>
-                      <td style={{ padding: '4px' }}>~7x</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '4px' }}>small</td>
-                      <td style={{ padding: '4px' }}>244M</td>
-                      <td style={{ padding: '4px' }}>small.en</td>
-                      <td style={{ padding: '4px' }}>small</td>
-                      <td style={{ padding: '4px' }}>~2GB</td>
-                      <td style={{ padding: '4px' }}>~4x</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '4px' }}>medium</td>
-                      <td style={{ padding: '4px' }}>769M</td>
-                      <td style={{ padding: '4px' }}>medium.en</td>
-                      <td style={{ padding: '4px' }}>medium</td>
-                      <td style={{ padding: '4px' }}>~5GB</td>
-                      <td style={{ padding: '4px' }}>~2x</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '4px' }}>turbo</td>
-                      <td style={{ padding: '4px' }}>809M</td>
-                      <td style={{ padding: '4px' }}>N/A</td>
-                      <td style={{ padding: '4px' }}>turbo</td>
-                      <td style={{ padding: '4px' }}>~6GB</td>
-                      <td style={{ padding: '4px' }}>~8x</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div style={{ marginBottom: '20px', fontSize: '0.8rem' }}>
-                Detailed model info is not available for Faster-Whisper.
-              </div>
-            )}
+                  )}
+                </tbody>
+              </table>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
               <button 
                 onClick={saveConfig}
+                className="config-save-button"
                 style={{
                   padding: '10px 20px',
                   backgroundColor: '#4f46e5',
@@ -399,6 +390,7 @@ const Home = () => {
               </button>
               <button 
                 onClick={() => setShowConfig(false)}
+                className="config-close-button"
                 style={{
                   padding: '10px 20px',
                   backgroundColor: '#ef4444',

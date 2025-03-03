@@ -1,22 +1,41 @@
-# YouTube Video Transcriber - Setup Guide
+# YouTube Video Transcriber - Documentation
 
-This project consists of a Flask backend for transcription processing and a React frontend for the user interface.
+A full-featured YouTube video transcription application with AI-powered notes and summaries.
+
+## Features
+
+- **Transcription of YouTube videos** using OpenAI's Whisper or Faster-Whisper
+- **Synchronized video and transcript** - click on text to jump to that point in the video
+- **AI-generated smart notes and summaries**
+- **Advanced search capabilities**:
+  - Full-text search within transcripts
+  - Keyboard shortcuts (Enter to search, F3/Shift+F3 to navigate results, Esc to clear)
+  - Result highlighting
+- **Filtering and organization**:
+  - Filter by status, date range
+  - Sort alphabetically or by date
+  - Search by title
+- **Real-time transcription feedback** with animated updates
+- **Multiple export formats** (PDF, TXT)
+- **Responsive design** with dark/light mode support
+- **Persistent theme settings**
+- **Detailed model configuration** with size/performance options
+- **Job history and status tracking**
 
 ## Prerequisites
 
 - Python 3.8+ with pip
 - Node.js 14+ with npm
 - ffmpeg (required for audio processing)
+- CUDA-compatible GPU recommended for faster processing
 
 ## Backend Setup
 
 1. Create a project directory and set up a Python virtual environment:
 
 ```bash
-mkdir youtube-transcriber
-cd youtube-transcriber
-mkdir backend
-cd backend
+mkdir -p youtube-transcriber/backend
+cd youtube-transcriber/backend
 python -m venv venv
 
 # Activate the virtual environment
@@ -26,18 +45,13 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-2. Create the necessary files:
-
-- Copy the backend code to `app.py`
-- Create a `requirements.txt` file with the dependencies
-
-3. Install the requirements:
+2. Install the dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install flask flask-cors whisper faster-whisper yt-dlp transformers nltk torch
 ```
 
-4. Install ffmpeg (if not already installed):
+3. Install ffmpeg (if not already installed):
 
 - **macOS**: `brew install ffmpeg`
 - **Ubuntu/Debian**: `sudo apt install ffmpeg`
@@ -53,30 +67,10 @@ npx create-react-app frontend
 cd frontend
 ```
 
-2. Create the component structure:
+2. Install additional dependencies:
 
 ```bash
-mkdir -p src/components
-```
-
-3. Copy the provided component files to their respective locations:
-   - `src/App.js`
-   - `src/App.css`
-   - `src/components/Home.js`
-   - `src/components/Home.css`
-   - `src/components/Navbar.js`
-   - `src/components/Navbar.css`
-   - `src/components/TranscriptionView.js`
-   - `src/components/TranscriptionView.css`
-   - `src/components/JobsList.js`
-   - `src/components/JobsList.css`
-   - `src/index.js`
-   - `src/index.css`
-
-4. Install additional dependencies:
-
-```bash
-npm install react-router-dom
+npm install react-router-dom jspdf
 ```
 
 ## Running the Application
@@ -100,21 +94,40 @@ npm start
 
 ## System Architecture
 
-- **Backend**: Flask server with the following components:
-  - YouTube audio downloader (yt-dlp)
-  - Whisper model for transcription
-  - BART model for summarization and note generation
-  - API endpoints for job management and data retrieval
+### Backend Components
 
-- **Frontend**: React application with:
-  - Modern, responsive UI
-  - Real-time job status updates
-  - Tabbed view for transcript and notes
-  - Job history tracking
+- **Flask Web Server** - Handles HTTP requests and serves the API
+- **Whisper/Faster-Whisper Models** - State-of-the-art speech recognition
+- **YouTube Downloader** - Uses yt-dlp to extract audio
+- **BART Summarization Model** - Generates notes and summaries
+- **Persistent Storage** - Saves transcripts, notes, and configuration settings
+
+### Frontend Structure
+
+- **Home Page** - URL input and model configuration
+- **Transcription View** - Video player, synchronized transcript, and smart notes
+- **Jobs List** - Search and filter previous transcriptions
+- **Responsive UI** - Adapts to different screen sizes
+- **Theme Support** - Dark/light mode with persistent settings
+
+## Model Configuration
+
+The application supports two transcription engines:
+
+1. **Whisper** - Original OpenAI model
+2. **Faster-Whisper** - CTranslate2-powered optimized version
+
+Available model sizes:
+- **tiny** - 39M parameters, fastest, least accurate
+- **base** - 74M parameters
+- **small** - 244M parameters, good balance
+- **medium** - 769M parameters, more accurate
+- **large** - 1550M parameters (only with faster-whisper), most accurate
+- **turbo** - 809M parameters, specialized for speed
 
 ## Production Deployment
 
-For a production deployment, you would need to:
+For a production deployment:
 
 1. Build the React frontend:
 ```bash
@@ -132,19 +145,48 @@ gunicorn -w 4 app:app
 4. Consider using a process manager like Supervisor or systemd
 5. Set up Nginx as a reverse proxy
 
-## Features
+## Folder Structure
+youtube-transcriber/
+├── backend/
+│   ├── app.py                 # Main Flask application
+│   ├── config.json            # Configuration settings
+│   ├── downloads/             # Downloaded audio files
+│   ├── logs/                  # Application logs
+│   ├── models/                # Downloaded model files
+│   │   ├── whisper/           # OpenAI Whisper models
+│   │   └── faster-whisper/    # Faster-Whisper models
+│   ├── notes/                 # Generated notes storage
+│   └── transcripts/           # Generated transcripts storage
+└── frontend/
+    ├── public/                # Static assets
+    └── src/
+        ├── assets/            # Images and icons
+        │   └── icons8-cog.gif # Settings icon
+        ├── components/
+        │   ├── Home.js        # Landing page component
+        │   ├── Home.css       # Landing page styles
+        │   ├── Navbar.js      # Navigation component
+        │   ├── Navbar.css     # Navigation styles
+        │   ├── TranscriptionView.js # Transcript/video viewer
+        │   ├── TranscriptionView.css # Transcript/video styles
+        │   ├── JobsList.js    # Job history component
+        │   └── JobsList.css   # Job history styles
+        ├── App.js             # Main application component
+        ├── App.css            # Main application styles
+        ├── index.js           # Application entry point
+        └── index.css          # Global styles
 
-- Transcription of YouTube videos
-- Time-stamped transcript segments
-- AI-generated notes and summaries
-- Key points extraction
-- Job history and status tracking
-- Modern, responsive UI
+## Component Structure
 
-## Limitations & Potential Improvements
+### Frontend Components
 
-- Currently, the application does not have user authentication
-- Export functionality is not fully implemented
-- Could add more advanced filtering and search capabilities
-- Video embedding and synchronized transcript scrolling would enhance user experience
-- For large-scale deployment, consider using a task queue like Celery
+1. **Home Component** - Landing page with URL input and model configuration
+2. **Navbar Component** - Navigation bar with theme settings
+3. **TranscriptionView Component** - Main view with video player and transcript
+4. **JobsList Component** - Searchable
+
+### Backend Components
+
+1. **/api/transcribe:** POST request to transcribe a YouTube video
+2. **/api/job/<job_id>:** GET request to retrieve job status and results
+3. ...

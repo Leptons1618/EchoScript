@@ -10,7 +10,6 @@ import os
 import threading
 import time
 import uuid
-os.environ["CTRANSLATE2_DISABLE_EXECSTACK"] = "1"  # Disable executable stack for CTranslate2
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Third-Party Libraries
@@ -74,6 +73,18 @@ active_jobs = {}
 jobs_lock = threading.Lock()
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
+
+# Create a dictionary to store real-time transcription logs
+transcription_logs = {}
+
+# Add a function to append to transcription logs
+def append_transcription_log(job_id, text):
+    if job_id not in transcription_logs:
+        transcription_logs[job_id] = []
+    transcription_logs[job_id].append(text)
+    # Keep only the latest 50 logs
+    if len(transcription_logs[job_id]) > 50:
+        transcription_logs[job_id] = transcription_logs[job_id][-50:]
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_video():
@@ -140,7 +151,8 @@ def process_video(youtube_url, job_id):
             "text": transcript,
             "segments": segments,
             "title": info.get('title', 'Unknown'),
-            "channel": info.get('uploader', 'Unknown')
+            "channel": info.get('uploader', 'Unknown'),
+            "youtube_url": youtube_url  # Save the YouTube URL
         }
         transcript_path = os.path.join(TRANSCRIPT_DIR, f"{job_id}.json")
         with open(transcript_path, 'w') as f:
@@ -199,6 +211,7 @@ def get_model_path(model_type):
     os.makedirs(path, exist_ok=True)
     return path
 
+# Modify transcribe_audio to log segments as they're transcribed
 def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
     global transcription_model, current_whisper_model_size
     logger.info(f"Transcribing audio with {model_type} model ({model_size}) from {audio_path}")
@@ -213,6 +226,18 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
         faster_model = WhisperModel(model_size, device="cuda", compute_type="float16", download_root=model_path)
         result = faster_model.transcribe(audio_path)
         logger.info("Faster-Whisper transcription complete")
+        # Faster-whisper returns a tuple, not a dictionary
+        # The first element of the tuple is the segments generator
+        segments = list(result[0])
+        # Log segments as they're transcribed
+        job_id = os.path.basename(audio_path).split('.')[0]  # Extract job_id from filename
+        for segment in segments:
+            append_transcription_log(job_id, f"{formatTime(segment.start)} - {segment.text}")
+        # Extract text from segments
+        transcript = " ".join([segment.text for segment in segments])
+        # Convert segments to format expected by frontend
+        formatted_segments = [{"text": segment.text, "start": segment.start, "end": segment.end} for segment in segments]
+        return transcript, formatted_segments
     else:
         # For Whisper:
         if transcription_model is None:
@@ -222,39 +247,72 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
         # Use the already loaded model without reloading.
         result = transcription_model.transcribe(audio_path)
         logger.info("Whisper transcription complete")
-    return result["text"], result["segments"]
+        # Log segments as they're transcribed
+        job_id = os.path.basename(audio_path).split('.')[0]
+        for segment in result["segments"]:
+            append_transcription_log(job_id, f"{formatTime(segment['start'])} - {segment['text']}")
+        return result["text"], result["segments"]
+
+# Helper function to format time
+def formatTime(seconds):
+    minutes = int(seconds / 60)
+    secs = int(seconds % 60)
+    return f"{minutes}:{secs:02d}"
 
 def generate_notes(transcript):
     logger.info("Generating notes from transcript")
-    sentences = sent_tokenize(transcript)
-    chunks = []
-    current_chunk = ""
-    # Create chunks of roughly 1000 characters for summarization
-    for sentence in sentences:
-        if len(current_chunk) + len(sentence) < 1000:
-            current_chunk += " " + sentence
-        else:
+    
+    # Check if summarizer is available
+    global summarizer
+    if summarizer is None:
+        logger.warning("Summarizer model is not available. Using original transcript as summary.")
+        return {
+            "summary": transcript,
+            "key_points": [],
+            "original_transcript": transcript
+        }
+    
+    try:
+        sentences = sent_tokenize(transcript)
+        chunks = []
+        current_chunk = ""
+        # Create chunks of roughly 1000 characters for summarization
+        for sentence in sentences:
+            if len(current_chunk) + len(sentence) < 1000:
+                current_chunk += " " + sentence
+            else:
+                chunks.append(current_chunk.strip())
+                current_chunk = sentence
+        if current_chunk:
             chunks.append(current_chunk.strip())
-            current_chunk = sentence
-    if current_chunk:
-        chunks.append(current_chunk.strip())
-    summaries = []
-    for chunk in chunks:
-        if len(chunk) < 50:  # Skip very short chunks
-            continue
-        summary = summarizer(chunk, max_length=100, min_length=30, do_sample=False)
-        summaries.append(summary[0]['summary_text'])
-    key_points = []
-    for summary in summaries:
-        points = sent_tokenize(summary)
-        key_points.extend(points)
-    notes = {
-        "summary": " ".join(summaries),
-        "key_points": key_points,
-        "original_transcript": transcript
-    }
-    logger.info("Notes generated successfully")
-    return notes
+        
+        summaries = []
+        for chunk in chunks:
+            if len(chunk) < 50:  # Skip very short chunks
+                continue
+            summary = summarizer(chunk, max_length=100, min_length=30, do_sample=False)
+            summaries.append(summary[0]['summary_text'])
+        
+        key_points = []
+        for summary in summaries:
+            points = sent_tokenize(summary)
+            key_points.extend(points)
+        
+        notes = {
+            "summary": " ".join(summaries),
+            "key_points": key_points,
+            "original_transcript": transcript
+        }
+        logger.info("Notes generated successfully")
+        return notes
+    except Exception as e:
+        logger.error(f"Error in note generation: {str(e)}")
+        # Fallback: return original transcript if summarization fails
+        return {
+            "summary": transcript,
+            "key_points": [],
+            "original_transcript": transcript
+        }
 
 @app.route('/api/load_model', methods=['POST'])
 def load_model_config():
@@ -265,6 +323,20 @@ def load_model_config():
     with open(CONFIG_FILE, 'w') as f:
         json.dump({"model_type": model_type, "model_size": model_size}, f)
     global transcription_model, current_whisper_model_size, summarizer
+    
+    # Load summarization model regardless of whisper/faster-whisper selection
+    logger.info("Loading summarization model: facebook/bart-large-cnn...")
+    try:
+        summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+        if summarizer is not None:
+            logger.info("Summarization model loaded successfully: facebook/bart-large-cnn")
+        else:
+            logger.error("Failed to load summarization model: facebook/bart-large-cnn")
+    except Exception as e:
+        logger.error(f"Error loading summarization model: {str(e)}")
+        summarizer = None
+    
+    # Continue with loading the appropriate transcription model
     if model_type == "whisper":
         if 'transcription_model' in globals() and transcription_model is not None:
             logger.info("Disallocating current Whisper model...")
@@ -278,14 +350,7 @@ def load_model_config():
         model_path = get_model_path("whisper")
         transcription_model = whisper.load_model(model_size, download_root=model_path)
         current_whisper_model_size = model_size
-        # Load summarization model after loading Whisper
-        logger.info("Loading summarization model: facebook/bart-large-cnn...")
-        summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-        if summarizer is not None:
-            logger.info("Summarization model loaded successfully: facebook/bart-large-cnn")
-        else:
-            logger.error("Failed to load summarization model: facebook/bart-large-cnn")
-        logger.info(f"Completed loading Whisper {model_size} model and summarization model")
+        logger.info(f"Completed loading Whisper {model_size} model")
     elif model_type == "faster-whisper":
         from faster_whisper import WhisperModel
         model_path = get_model_path("faster-whisper")
@@ -301,10 +366,36 @@ def get_config():
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
     else:
-        config = {"model_type": "whisper", "model_size": "medium"}
+        config = {"model_type": "whisper", "model_size": "medium", "theme": "light"}
     # Add model_status to indicate whether a model is loaded
     config["model_status"] = "loaded" if transcription_model is not None else "no model loaded"
     return jsonify(config), 200
+
+# Add a new endpoint to save theme preference
+@app.route('/api/save_theme', methods=['POST'])
+def save_theme():
+    try:
+        data = request.json
+        theme = data.get('theme', 'light')
+        
+        # Read existing config
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+        else:
+            config = {"model_type": "whisper", "model_size": "medium"}
+        
+        # Update theme
+        config["theme"] = theme
+        
+        # Save updated config
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f)
+            
+        return jsonify({"message": f"Theme set to {theme}"}), 200
+    except Exception as e:
+        logger.error(f"Error saving theme: {str(e)}")
+        return jsonify({"error": f"Failed to save theme: {str(e)}"}), 500
 
 @app.route('/api/job/<job_id>', methods=['GET'])
 def get_job_status(job_id):
@@ -400,6 +491,13 @@ def list_jobs():
     
     job_list.sort(key=lambda x: x["created_at"], reverse=True)
     return jsonify({"jobs": job_list})
+
+# Add a new API endpoint to get the logs
+@app.route('/api/logs/<job_id>', methods=['GET'])
+def get_job_logs(job_id):
+    if job_id in transcription_logs:
+        return jsonify({"logs": transcription_logs[job_id]})
+    return jsonify({"logs": []})
 
 # Serve React frontend in production
 @app.route('/', defaults={'path': ''})
