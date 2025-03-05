@@ -109,3 +109,236 @@
 .start-button:hover {
   background-color: #4338ca;
 }
+
+/* Advanced filtering controls */
+.filter-controls {
+  margin-bottom: 20px;
+  padding: 16px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.search-container {
+  display: flex;
+  width: 100%;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px 0 0 6px;
+  font-size: 14px;
+}
+
+.search-button {
+  padding: 10px 16px;
+  background-color: #4f46e5;
+  border: none;
+  border-radius: 0 6px 6px 0;
+  color: white;
+  cursor: pointer;
+}
+
+.filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-select, .date-input {
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 120px;
+}
+
+.date-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.reset-filters-button {
+  padding: 8px 16px;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  align-self: flex-start;
+}
+
+.reset-filters-button:hover {
+  background-color: #e5e7eb;
+}
+
+.results-info {
+  margin-bottom: 16px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.no-results {
+  text-align: center;
+  padding: 40px 0;
+  color: #6b7280;
+}
+
+.reset-button {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.reset-button:hover {
+  background-color: #4338ca;
+}
+
+/* Dark mode styles */
+body.dark .filter-controls {
+  background-color: #2d3748;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+body.dark .search-input,
+body.dark .filter-select,
+body.dark .date-input {
+  background-color: #4a5568;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+body.dark .reset-filters-button {
+  background-color: #4a5568;
+  color: #e2e8f0;
+  border-color: #4a5568;
+}
+
+body.dark .reset-filters-button:hover {
+  background-color: #374151;
+}
+
+body.dark .results-info {
+  color: #cbd5e0;
+}
+
+body.dark .no-results {
+  color: #cbd5e0;
+}
+
+/* Dark mode styles - Enhanced */
+body.dark .jobs-list h2 {
+  color: #f1f5f9;
+}
+
+body.dark .job-card {
+  background-color: #2d3748;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: 1px solid #4b5563;
+}
+
+body.dark .job-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+  border-color: #60a5fa;
+}
+
+body.dark .job-title {
+  color: #f1f5f9;
+}
+
+body.dark .job-created {
+  color: #cbd5e0;
+}
+
+/* Improved status indicators for dark mode */
+body.dark .status-indicator.complete {
+  background-color: #10b981;
+  box-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
+}
+
+body.dark .status-indicator.error {
+  background-color: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
+}
+
+body.dark .status-indicator.downloading,
+body.dark .status-indicator.transcribing,
+body.dark .status-indicator.generating_notes {
+  background-color: #f59e0b;
+  box-shadow: 0 0 4px rgba(245, 158, 11, 0.6);
+}
+
+/* Dark mode spinner */
+body.dark .spinner {
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top: 4px solid #93c5fd;
+}
+
+body.dark .jobs-loading,
+body.dark .jobs-error,
+body.dark .no-jobs {
+  color: #e2e8f0;
+}
+
+/* Dark mode for filter controls */
+body.dark .filter-controls {
+  background-color: #1f2937;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  border: 1px solid #374151;
+}
+
+/* Improved contrast for filter selects in dark mode */
+body.dark .filter-select,
+body.dark .date-input {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+body.dark .filter-select:focus,
+body.dark .date-input:focus,
+body.dark .search-input:focus {
+  border-color: #60a5fa;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
+}
+
+/* Enhance reset filters button for dark mode */
+body.dark .reset-filters-button {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+body.dark .reset-filters-button:hover {
+  background-color: #4b5563;
+}
+
+/* Fix reset button for no results in dark mode */
+body.dark .reset-button {
+  background-color: #3b82f6;
+}
+
+body.dark .reset-button:hover {
+  background-color: #2563eb;
+}

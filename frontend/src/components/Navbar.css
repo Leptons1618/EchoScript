@@ -46,15 +46,40 @@
   cursor: pointer;
   font-size: 1.5rem;
   margin-left: 20px;
+  transition: transform 0.3s ease;
 }
 
-/* Light/Dark theme classes on body */
+.theme-toggle:hover {
+  transform: scale(1.1) rotate(15deg);
+}
+
+/* Enhanced Light/Dark theme classes */
 body.light {
-  background-color: #ffffff;
+  background-color: #f8fafc;
   color: #1f2937;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body.dark {
-  background-color: #1f2937;
-  color: #f9fafb;
+  background-color: #1e293b;
+  color: #f1f5f9;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Navbar dark theme adaptations */
+body.dark .navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+body.dark .navbar-item:hover {
+  background-color: #334155;
+}
+
+/* For Accessibility */
+body.dark a {
+  color: #93c5fd;
+}
+
+body.light a {
+  color: #3b82f6;
 }
