@@ -1,6 +1,6 @@
 // src/components/TranscriptionView.js
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import './TranscriptionView.css';
 
@@ -13,7 +13,11 @@ const TranscriptionView = () => {
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
+  const [timeEstimate, setTimeEstimate] = useState(null);
   const prevStatusRef = useRef('');
+  const startTimeRef = useRef(Date.now());
+  const pollIntervalRef = useRef(null);
+  const navigate = useNavigate();
   
   // Determine target progress based on status
   const getTargetProgress = (status) => {
@@ -27,6 +31,11 @@ const TranscriptionView = () => {
   };
   
   useEffect(() => {
+    // Add initial log message
+    const timestamp = new Date().toLocaleTimeString();
+    setLogs([`[${timestamp}] Starting transcription process...`]);
+    startTimeRef.current = Date.now();
+    
     // Poll job status
     const checkStatus = async () => {
       try {
@@ -38,8 +47,18 @@ const TranscriptionView = () => {
           // If complete, fetch transcript and notes
           if (data.status === 'complete') {
             fetchTranscriptAndNotes();
+            // Clear polling interval on completion
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
           } else if (data.status === 'error') {
             setError(data.error || 'An error occurred processing this video');
+            // Clear polling interval on error
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
           }
         } else {
           setError('Failed to fetch job status');
@@ -57,6 +76,13 @@ const TranscriptionView = () => {
         if (transcriptResponse.ok) {
           const transcriptData = await transcriptResponse.json();
           setTranscript(transcriptData);
+          
+          // Log transcript segments received
+          const timestamp = new Date().toLocaleTimeString();
+          setLogs(prev => [
+            ...prev, 
+            `[${timestamp}] Transcript received with ${transcriptData.segments?.length || 0} segments`
+          ]);
         }
         
         // Fetch notes
@@ -64,6 +90,22 @@ const TranscriptionView = () => {
         if (notesResponse.ok) {
           const notesData = await notesResponse.json();
           setNotes(notesData);
+          
+          // Log notes received
+          const timestamp = new Date().toLocaleTimeString();
+          setLogs(prev => [
+            ...prev, 
+            `[${timestamp}] Smart notes generated successfully`
+          ]);
+          
+          // Add a final completion message
+          setTimeout(() => {
+            const finalTimestamp = new Date().toLocaleTimeString();
+            setLogs(prev => [
+              ...prev, 
+              `[${finalTimestamp}] All processing complete! Enjoy your transcript.`
+            ]);
+          }, 1000);
         }
       } catch (err) {
         setError('Error fetching transcript data');
@@ -74,16 +116,18 @@ const TranscriptionView = () => {
     checkStatus();
     
     // Poll until complete
-    const interval = setInterval(() => {
+    pollIntervalRef.current = setInterval(() => {
       if (jobStatus.status !== 'complete' && jobStatus.status !== 'error') {
         checkStatus();
-      } else {
-        clearInterval(interval);
       }
     }, 5000);
     
-    return () => clearInterval(interval);
-  }, [jobId, jobStatus.status]);
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, [jobId]);
   
   // Timer to update progress gradually until target progress is reached
   useEffect(() => {
@@ -99,13 +143,75 @@ const TranscriptionView = () => {
     return () => clearInterval(timer);
   }, [jobStatus.status]);
   
-  // Log status changes for background display
+  // Calculate and update time estimate
   useEffect(() => {
-    if (prevStatusRef.current !== jobStatus.status) {
-      setLogs(prev => [...prev, `Status changed to: ${jobStatus.status}`]);
-      prevStatusRef.current = jobStatus.status;
+    if (progress > 0 && progress < 100) {
+      const elapsedMs = Date.now() - startTimeRef.current;
+      const estimatedTotalMs = (elapsedMs / progress) * 100;
+      const remainingMs = estimatedTotalMs - elapsedMs;
+      const remainingMinutes = Math.ceil(remainingMs / 60000);
+      setTimeEstimate(remainingMinutes);
     }
-  }, [jobStatus.status]);
+  }, [progress]);
+  
+  // Log status changes for background display with timestamps
+  useEffect(() => {
+    if (prevStatusRef.current !== jobStatus.status && jobStatus.status) {
+      const timestamp = new Date().toLocaleTimeString();
+      let statusMessage = '';
+      
+      switch(jobStatus.status) {
+        case 'downloading':
+          statusMessage = 'Downloading audio from YouTube video...';
+          break;
+        case 'transcribing':
+          statusMessage = 'Transcribing audio to text (this may take several minutes)...';
+          break;
+        case 'generating_notes':
+          statusMessage = 'Generating smart notes from transcript...';
+          break;
+        case 'complete':
+          statusMessage = 'Processing complete! Loading results...';
+          break;
+        case 'error':
+          statusMessage = 'Error encountered during processing.';
+          break;
+        default:
+          statusMessage = `Status changed to: ${jobStatus.status}`;
+      }
+      
+      setLogs(prev => [...prev, `[${timestamp}] ${statusMessage}`]);
+      prevStatusRef.current = jobStatus.status;
+      
+      // Every 10 seconds during transcription, add a reassuring message
+      if (jobStatus.status === 'transcribing') {
+        const reassuranceInterval = setInterval(() => {
+          const newTimestamp = new Date().toLocaleTimeString();
+          setLogs(prev => [
+            ...prev, 
+            `[${newTimestamp}] Still transcribing audio... ${
+              timeEstimate ? `(estimated ${timeEstimate} min remaining)` : ''
+            }`
+          ]);
+        }, 10000);
+        
+        return () => clearInterval(reassuranceInterval);
+      }
+    }
+  }, [jobStatus.status, timeEstimate]);
+  
+  // Auto-navigate to completed transcript view when ready
+  useEffect(() => {
+    if (jobStatus.status === 'complete' && transcript && notes) {
+      // Add a slight delay to let user see the completion message
+      const navTimer = setTimeout(() => {
+        // Use the same URL but force component rerender to show the completed view
+        navigate(`/view/${jobId}`, { replace: true });
+      }, 2000);
+      
+      return () => clearTimeout(navTimer);
+    }
+  }, [jobStatus.status, transcript, notes, jobId, navigate]);
   
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -155,7 +261,11 @@ const TranscriptionView = () => {
       <div className="processing-status">
         <div className="status-indicator">
           <div className={`status-icon ${jobStatus.status}`}></div>
-          <div className="status-text">{statusMessages[jobStatus.status] || jobStatus.status} ({progress}%)</div>
+          <div className="status-text">
+            {statusMessages[jobStatus.status] || jobStatus.status} ({progress}%)
+            {timeEstimate && jobStatus.status === 'transcribing' && 
+              ` • Est. ${timeEstimate} min remaining`}
+          </div>
         </div>
         {jobStatus.status !== "complete" && jobStatus.status !== "error" && (
           <div className="progress-bar-container">
@@ -264,19 +374,13 @@ const TranscriptionView = () => {
           )}
         </>
       )}
-      {/* Conditionally render log-display only when not complete and not error */}
+      {/* Improved log display section */}
       {jobStatus.status !== 'complete' && jobStatus.status !== 'error' && (
-        <div className="log-display" style={{
-          marginTop: '20px',
-          fontSize: '0.8rem',
-          color: '#666',
-          background: '#f9f9f9',
-          padding: '10px',
-          borderRadius: '6px',
-          maxHeight: '150px',
-          overflowY: 'auto'
-        }}>
-          {logs.map((msg, index) => <div key={index}>{msg}</div>)}
+        <div className="log-display">
+          <h4>Transcription Progress</h4>
+          <div className="log-messages">
+            {logs.map((msg, index) => <div key={index} className="log-entry">{msg}</div>)}
+          </div>
         </div>
       )}
       {/* Footer */}
