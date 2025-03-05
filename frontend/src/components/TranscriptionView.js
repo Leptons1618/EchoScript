@@ -289,33 +289,298 @@ const TranscriptionView = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
   
+  // Enhanced export functions
   const exportAsTXT = () => {
     let content = "";
-    if (transcript && transcript.text) {
-      content += "Transcript:\n" + transcript.text + "\n\n";
+    const exportDate = new Date().toLocaleString();
+    
+    // Add video information header
+    if (transcript) {
+      content += "=".repeat(80) + "\n";
+      content += `YOUTUBE VIDEO TRANSCRIPT\n`;
+      content += `Export Date: ${exportDate}\n`;
+      content += "=".repeat(80) + "\n\n";
+      
+      content += `Title: ${transcript.title || "Unknown"}\n`;
+      content += `Channel: ${transcript.channel || "Unknown"}\n`;
+      content += `URL: ${transcript.youtube_url || ""}\n\n`;
+      content += "=".repeat(80) + "\n\n";
     }
+    
+    // Add formatted notes section
     if (notes && notes.summary) {
-      content += "Notes Summary:\n" + notes.summary + "\n\n";
+      content += "SUMMARY\n";
+      content += "-".repeat(80) + "\n";
+      content += formatTextForExport(notes.summary) + "\n\n";
+      
+      // Add key points
+      if (notes.key_points && notes.key_points.length > 0) {
+        content += "KEY POINTS\n";
+        content += "-".repeat(80) + "\n";
+        notes.key_points.forEach((point, index) => {
+          content += `${index + 1}. ${point}\n`;
+        });
+        content += "\n\n";
+      }
     }
+    
+    // Add formatted transcript with timestamps
+    if (transcript && transcript.segments) {
+      content += "TRANSCRIPT WITH TIMESTAMPS\n";
+      content += "-".repeat(80) + "\n\n";
+      
+      transcript.segments.forEach(segment => {
+        const timestamp = formatTime(segment.start);
+        content += `[${timestamp}] ${segment.text}\n`;
+      });
+    } else if (transcript && transcript.text) {
+      content += "TRANSCRIPT\n";
+      content += "-".repeat(80) + "\n\n";
+      content += formatTextForExport(transcript.text);
+    }
+    
+    // Use more descriptive filename with date and title
+    const safeTitle = transcript?.title?.replace(/[^a-z0-9]/gi, '_').substring(0, 20) || 'transcript';
+    const fileName = `${safeTitle}_${new Date().toISOString().slice(0,10)}.txt`;
+    
+    // Create and trigger download
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `export_${jobId}.txt`;
+    link.download = fileName;
     link.click();
+    
+    // Clean up
+    setTimeout(() => {
+      URL.revokeObjectURL(link.href);
+    }, 100);
   };
-
+  
   const exportAsPDF = () => {
-    let content = "";
-    if (transcript && transcript.text) {
-      content += "Transcript:\n" + transcript.text + "\n\n";
+    try {
+      // Create PDF with portrait orientation
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Set initial position and page dimensions
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      let y = margin;
+      
+      // Add title and metadata
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      
+      if (transcript) {
+        // Add title (with wrapping if necessary)
+        const title = transcript.title || "YouTube Video Transcript";
+        const titleLines = doc.splitTextToSize(title, pageWidth - 2 * margin);
+        doc.text(titleLines, margin, y);
+        y += 10 * (titleLines.length);
+        
+        // Add channel and date
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Channel: ${transcript.channel || "Unknown"}`, margin, y);
+        y += 6;
+        doc.text(`Export Date: ${new Date().toLocaleString()}`, margin, y);
+        y += 6;
+        
+        // Add URL with link
+        if (transcript.youtube_url) {
+          doc.setTextColor(0, 0, 255);
+          doc.textWithLink("Video Link", margin, y, { url: transcript.youtube_url });
+          doc.setTextColor(0, 0, 0);
+        }
+        y += 10;
+        
+        // Add horizontal line
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 10;
+      }
+      
+      // Add summary section
+      if (notes && notes.summary) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text("Summary", margin, y);
+        y += 8;
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        const summaryLines = doc.splitTextToSize(notes.summary, pageWidth - 2 * margin);
+        
+        // Check if we need a new page
+        if (y + summaryLines.length * 5 > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        
+        doc.text(summaryLines, margin, y);
+        y += summaryLines.length * 5 + 8;
+        
+        // Add key points
+        if (notes.key_points && notes.key_points.length > 0) {
+          // Check if we need a new page
+          if (y + 10 > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+          
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(14);
+          doc.text("Key Points", margin, y);
+          y += 8;
+          
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(11);
+          
+          for (let i = 0; i < notes.key_points.length; i++) {
+            const point = notes.key_points[i];
+            const pointLines = doc.splitTextToSize(`${i + 1}. ${point}`, pageWidth - 2 * margin - 5);
+            
+            // Check if we need a new page
+            if (y + pointLines.length * 5 > pageHeight - margin) {
+              doc.addPage();
+              y = margin;
+            }
+            
+            doc.text(pointLines, margin, y);
+            y += pointLines.length * 5 + 3;
+          }
+          
+          y += 5;
+        }
+      }
+      
+      // Add transcript with timestamps
+      if (transcript && transcript.segments) {
+        // Check if we need a new page
+        if (y + 20 > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 10;
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text("Transcript", margin, y);
+        y += 8;
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        
+        for (const segment of transcript.segments) {
+          const timestamp = formatTime(segment.start);
+          const text = `[${timestamp}] ${segment.text}`;
+          const segmentLines = doc.splitTextToSize(text, pageWidth - 2 * margin);
+          
+          // Check if we need a new page
+          if (y + segmentLines.length * 4 > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+          
+          doc.setFont('helvetica', 'bold');
+          doc.text(`[${timestamp}]`, margin, y);
+          
+          doc.setFont('helvetica', 'normal');
+          // Calculate text position after timestamp
+          const timestampWidth = doc.getTextWidth(`[${timestamp}] `);
+          const segmentText = doc.splitTextToSize(segment.text, pageWidth - 2 * margin - timestampWidth);
+          doc.text(segmentText, margin + timestampWidth, y);
+          
+          y += segmentText.length * 4 + 2;
+        }
+      } else if (transcript && transcript.text) {
+        // Fallback if no segments are available
+        if (y + 20 > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text("Transcript", margin, y);
+        y += 8;
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        const transcriptLines = doc.splitTextToSize(transcript.text, pageWidth - 2 * margin);
+        
+        // Add transcriptLines with pagination
+        let linesLeft = transcriptLines.length;
+        let currentLine = 0;
+        
+        while (linesLeft > 0) {
+          // Calculate lines that will fit on current page
+          const maxLines = Math.floor((pageHeight - margin - y) / 4);
+          const linesToAdd = Math.min(maxLines, linesLeft);
+          
+          if (linesToAdd <= 0) {
+            doc.addPage();
+            y = margin;
+            continue;
+          }
+          
+          // Add text to current page
+          doc.text(
+            transcriptLines.slice(currentLine, currentLine + linesToAdd),
+            margin,
+            y
+          );
+          
+          linesLeft -= linesToAdd;
+          currentLine += linesToAdd;
+          
+          if (linesLeft > 0) {
+            doc.addPage();
+            y = margin;
+          } else {
+            y += linesToAdd * 4;
+          }
+        }
+      }
+      
+      // Add page numbers
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(10);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
+      }
+      
+      // Use a more descriptive filename with date and title
+      const safeTitle = transcript?.title?.replace(/[^a-z0-9]/gi, '_').substring(0, 20) || 'transcript';
+      const fileName = `${safeTitle}_${new Date().toISOString().slice(0,10)}.pdf`;
+      doc.save(fileName);
+      
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      alert("There was an error generating the PDF. Please try again.");
     }
-    if (notes && notes.summary) {
-      content += "Notes Summary:\n" + notes.summary + "\n\n";
-    }
-    const doc = new jsPDF();
-    const lines = doc.splitTextToSize(content, 180);
-    doc.text(lines, 10, 10);
-    doc.save(`export_${jobId}.pdf`);
+  };
+  
+  // Helper function to nicely format text
+  const formatTextForExport = (text) => {
+    // Add proper line breaks and indentation
+    const paragraphs = text
+      .replace(/\.(\s+)/g, '.\n\n')  // Add double line break after periods
+      .replace(/\n{3,}/g, '\n\n')    // Normalize multiple line breaks
+      .split('\n\n');
+    
+    return paragraphs
+      .map(p => p.trim())
+      .filter(p => p.length > 0)
+      .join('\n\n');
   };
 
   // Search functionality for transcript
