@@ -181,7 +181,7 @@
 
 .notes-section p, .notes-section li {
   line-height: 1.6;
-  color: #4b5563;
+  color: #b7bcc4;
   margin-bottom: 10px;
 }
 
@@ -633,6 +633,32 @@ body.dark .search-input:focus {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 10px;
+  scroll-behavior: smooth;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px;
+  background-color: rgba(249, 250, 251, 0.7);
+}
+
+.transcription-progress-indicator {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+body.dark .transcription-progress-indicator {
+  color: #93c5fd;
+}
+
+body.dark .transcription-logs {
+  border-color: #4b5563;
+  background-color: rgba(31, 41, 55, 0.7);
 }
 
 .log-transcript-entry {
@@ -660,6 +686,25 @@ body.dark .search-input:focus {
     opacity: 1;
     background-color: #f3f4f6;
   }
+}
+
+/* Improved animation for new transcription entries */
+.log-transcript-entry.new-entry {
+  animation: newEntryFlash 1s ease-out;
+}
+
+@keyframes newEntryFlash {
+  0%, 100% { background-color: #f3f4f6; }
+  50% { background-color: rgba(79, 70, 229, 0.2); }
+}
+
+body.dark .log-transcript-entry.new-entry {
+  animation: newEntryFlashDark 1s ease-out;
+}
+
+@keyframes newEntryFlashDark {
+  0%, 100% { background-color: #2d3748; }
+  50% { background-color: rgba(79, 70, 229, 0.3); }
 }
 
 /* Enhanced status indicators during processing */
@@ -743,4 +788,190 @@ body.dark .status-history {
 
 body.dark .status-history-entry {
   color: #9ca3af;
+}
+
+/* Enhanced transcription log display */
+.transcription-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 500;
+  justify-content: space-between;
+}
+
+.log-counter {
+  font-size: 0.8rem;
+  background-color: #4f46e5;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: auto;
+}
+
+.transcription-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 10px;
+  scroll-behavior: smooth;
+}
+
+/* Always show the most recent logs by automatically scrolling */
+.transcription-logs::-webkit-scrollbar {
+  width: 8px;
+}
+
+.transcription-logs::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.transcription-logs::-webkit-scrollbar-thumb {
+  background: #c7d2fe;
+  border-radius: 4px;
+}
+
+.transcription-logs::-webkit-scrollbar-thumb:hover {
+  background: #a5b4fc;
+}
+
+.log-transcript-entry {
+  padding: 8px 12px;
+  border-left: 3px solid #4f46e5;
+  border-radius: 3px;
+  font-family: monospace;
+  background-color: #f3f4f6;
+  transition: all 0.3s ease;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Improved animation for new transcript entries */
+.log-transcript-entry.new-entry {
+  animation: newEntryPulse 2s ease-out;
+}
+
+@keyframes newEntryPulse {
+  0% {
+    background-color: rgba(79, 70, 229, 0.2);
+    border-left-color: #4f46e5;
+    transform: translateX(-5px);
+  }
+  100% {
+    background-color: #f3f4f6;
+    border-left-color: #4f46e5;
+    transform: translateX(0);
+  }
+}
+
+/* Improved initializing animation */
+.transcription-initializing {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  background-color: rgba(79, 70, 229, 0.05);
+  border-radius: 6px;
+  border-left: 3px solid #4f46e5;
+}
+
+.initializing-animation {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(79, 70, 229, 0.3);
+  border-top: 3px solid #4f46e5;
+  border-radius: 50%;
+  margin-right: 12px;
+  animation: spin 1s linear infinite;
+}
+
+/* Auto-scroll indicator */
+.auto-scroll-indicator {
+  display: flex;
+  justify-content: center;
+  margin-top: 15px;
+  gap: 4px;
+}
+
+.scroll-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #cbd5e0;
+}
+
+.scroll-dot:nth-child(1) {
+  animation: scrollDot 1.4s infinite 0s;
+}
+.scroll-dot:nth-child(2) {
+  animation: scrollDot 1.4s infinite 0.2s;
+}
+.scroll-dot:nth-child(3) {
+  animation: scrollDot 1.4s infinite 0.4s;
+}
+
+@keyframes scrollDot {
+  0%, 60%, 100% { 
+    transform: translateY(0); 
+    background-color: #cbd5e0;
+  }
+  30% { 
+    transform: translateY(-4px); 
+    background-color: #4f46e5;
+  }
+}
+
+/* Dark mode adaptations */
+body.dark .transcription-header {
+  border-bottom-color: #4b5563;
+}
+
+body.dark .log-counter {
+  background-color: #3b82f6;
+}
+
+body.dark .transcription-logs::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+body.dark .transcription-logs::-webkit-scrollbar-thumb {
+  background: #60a5fa;
+}
+
+body.dark .transcription-logs::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+body.dark .transcription-initializing {
+  background-color: rgba(147, 197, 253, 0.05);
+}
+
+body.dark .initializing-animation {
+  border-color: rgba(147, 197, 253, 0.3);
+  border-top-color: #93c5fd;
+}
+
+body.dark .scroll-dot {
+  background-color: #6b7280;
+}
+
+body.dark .scroll-dot:nth-child(1),
+body.dark .scroll-dot:nth-child(2),
+body.dark .scroll-dot:nth-child(3) {
+  animation-name: scrollDotDark;
+}
+
+@keyframes scrollDotDark {
+  0%, 60%, 100% { 
+    transform: translateY(0); 
+    background-color: #6b7280;
+  }
+  30% { 
+    transform: translateY(-4px); 
+    background-color: #60a5fa;
+  }
 }

@@ -15,15 +15,39 @@ const Home = () => {
   const [modelSize, setModelSize] = useState('medium');
   // Set status initially to "no model loaded"
   const [modelLoadStatus, setModelLoadStatus] = useState("no model loaded");
+  // Add new state for summarizer model
+  const [summarizerModel, setSummarizerModel] = useState('bart-large-cnn');
+  const [availableSummarizers, setAvailableSummarizers] = useState({});
+  const [summarizerStatus, setSummarizerStatus] = useState("no summarizer loaded");
 
-  // New useEffect to fetch model status on startup
+  // Enhanced useEffect to fetch model status and configuration on startup
   useEffect(() => {
     fetch('http://localhost:5000/api/config')
       .then(res => res.json())
       .then(data => {
-          setModelLoadStatus(data.model_status || "no model loaded");
+        // Update model status
+        setModelLoadStatus(data.model_status || "no model loaded");
+        setSummarizerStatus(data.summarizer_status || "no summarizer loaded");
+        
+        // Update model type and size from server configuration
+        if (data.model_type) {
+          setModelType(data.model_type);
+        }
+        if (data.model_size) {
+          setModelSize(data.model_size);
+        }
+        if (data.summarizer_model) {
+          setSummarizerModel(data.summarizer_model);
+        }
+        
+        // Store available summarizers
+        if (data.available_summarizers) {
+          setAvailableSummarizers(data.available_summarizers);
+        }
+        
+        console.log("Loaded model configuration:", data.model_type, data.model_size, data.summarizer_model);
       })
-      .catch(err => console.error(err));
+      .catch(err => console.error("Error loading configuration:", err));
   }, []);
 
   const handleSubmit = async (e) => {
@@ -80,12 +104,17 @@ const Home = () => {
       const response = await fetch('http://localhost:5000/api/load_model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_type: modelType, model_size: modelSize }),
+        body: JSON.stringify({ 
+          model_type: modelType, 
+          model_size: modelSize,
+          summarizer_model: summarizerModel 
+        }),
       });
       const data = await response.json();
       if (response.ok) {
         console.log(data.message);
         setModelLoadStatus("loaded");
+        setSummarizerStatus("loaded");
       } else {
         alert('Failed to load the model configuration: ' + data.error);
       }
@@ -95,7 +124,7 @@ const Home = () => {
     }
   };
 
-  // Render model status display with animation icons
+  // Enhance the renderModelStatus function to show current model details
   const renderModelStatus = () => {
     if (modelLoadStatus === "loading") {
       return (
@@ -110,7 +139,20 @@ const Home = () => {
       return (
         <div className="model-status-container">
           <div className="status-icon-success">✓</div>
-          <span className="status-text">Loaded: {modelType} ({modelSize})</span>
+          <span className="status-text">
+            <span className="model-name">{modelType}</span> 
+            <span className="model-size">({modelSize})</span>
+            {summarizerStatus === "loaded" && (
+              <span className="summarizer-info"> + {summarizerModel} summarizer</span>
+            )}
+            <button 
+              onClick={() => setShowConfig(true)}
+              className="change-model-btn"
+              title="Change model"
+            >
+              Change
+            </button>
+          </span>
         </div>
       );
     } else if (modelLoadStatus === "no model loaded") {
@@ -273,7 +315,10 @@ const Home = () => {
                 value={modelType} 
                 onChange={(e) => {
                   setModelType(e.target.value);
-                  setModelSize("tiny"); // Reset size on type change
+                  // Don't reset size if same model type or if there's a compatible size
+                  if (e.target.value !== modelType) {
+                    setModelSize("tiny"); // Reset size only on model type change
+                  }
                 }}
               >
                 <option value="whisper">Whisper</option>
@@ -306,6 +351,25 @@ const Home = () => {
                 )}
               </select>
             </div>
+            {/* NEW: Summarizer model selection */}
+            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <label style={{ marginRight: '10px', fontSize: '0.9rem', minWidth: '70px' }}>Summarizer:</label>
+              <select 
+                value={summarizerModel} 
+                onChange={(e) => setSummarizerModel(e.target.value)}
+                style={{ minWidth: '180px' }}
+              >
+                {Object.keys(availableSummarizers).map(key => (
+                  <option key={key} value={key}>{key} ({availableSummarizers[key].size})</option>
+                ))}
+              </select>
+            </div>
+            {/* Summarizer model info */}
+            {availableSummarizers[summarizerModel] && (
+              <div style={{ marginBottom: '15px', fontSize: '0.85rem', color: '#666', textAlign: 'center' }}>
+                {availableSummarizers[summarizerModel].description}
+              </div>
+            )}
             <div style={{ marginBottom: '20px', maxHeight: '150px', overflowY: 'auto', fontSize: '0.8rem', textAlign: 'left' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>

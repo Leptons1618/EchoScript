@@ -1,5 +1,5 @@
 // src/components/TranscriptionView.js
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import './TranscriptionView.css';
@@ -210,32 +210,79 @@ const TranscriptionView = () => {
     }
   }, [jobStatus.status]);
 
-  // Fetch transcription logs while processing
+  // Consolidate the log polling into a single, optimized implementation that
+  // properly stops when transcription is complete
   useEffect(() => {
+    // Flag to track if this effect is still active
+    let isActive = true;
+    let lastLogCount = 0;
+    
+    // Clear any existing polling interval
+    if (logInterval.current) {
+      clearInterval(logInterval.current);
+      logInterval.current = null;
+    }
+    
+    // Start polling only if we're in transcribing state
     if (jobStatus.status === 'transcribing') {
-      // Start polling for real-time transcription logs
-      logInterval.current = setInterval(async () => {
+      // Clear logs when starting transcription
+      setTranscriptionLogs([]);
+      
+      // Define the polling function with adaptive interval
+      const getPollingInterval = (logCount) => {
+        return Math.min(2000, Math.max(500, logCount * 10));
+      };
+      
+      const fetchLogs = async () => {
+        // If component unmounted or status changed, stop polling
+        if (!isActive || jobStatus.status !== 'transcribing') {
+          return;
+        }
+
         try {
           const response = await fetch(`http://localhost:5000/api/logs/${jobId}`);
           if (response.ok) {
             const data = await response.json();
             if (data.logs && data.logs.length > 0) {
-              setTranscriptionLogs(data.logs);
+              // Only update state when new logs arrive
+              if (data.logs.length !== lastLogCount) {
+                setTranscriptionLogs(data.logs);
+                lastLogCount = data.logs.length;
+                
+                // Auto-scroll to latest log entries
+                window.requestAnimationFrame(() => {
+                  const logsContainer = document.querySelector('.transcription-logs');
+                  if (logsContainer) {
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                  }
+                });
+              }
             }
+          }
+          
+          // Check again if we should continue - stop if status changed
+          if (isActive && jobStatus.status === 'transcribing') {
+            setTimeout(fetchLogs, getPollingInterval(lastLogCount));
           }
         } catch (err) {
           console.error('Error fetching logs:', err);
-        }
-      }, 2000);
-      
-      return () => {
-        if (logInterval.current) {
-          clearInterval(logInterval.current);
+          // Retry after 2 seconds if still transcribing
+          if (isActive && jobStatus.status === 'transcribing') {
+            setTimeout(fetchLogs, 2000);
+          }
         }
       };
+      
+      // Start initial polling
+      fetchLogs();
     }
-  }, [jobId, jobStatus.status]);
-  
+    
+    // Cleanup: stop polling on unmount or when status changes
+    return () => {
+      isActive = false;
+    };
+  }, [jobId, jobStatus.status]); // Only re-run when jobId or status changes
+
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
@@ -319,23 +366,6 @@ const TranscriptionView = () => {
     setSearchResults([]);
   }, [setTranscriptSearch, setSearchResults]);
 
-  // Highlight search term in text
-  const highlightSearchTerm = (text) => {
-    if (!transcriptSearch.trim()) return text;
-    
-    const parts = text.split(new RegExp(`(${transcriptSearch})`, 'gi'));
-    
-    return (
-      <>
-        {parts.map((part, i) => 
-          part.toLowerCase() === transcriptSearch.toLowerCase() ? 
-            <mark key={i} className="search-highlight">{part}</mark> : 
-            part
-        )}
-      </>
-    );
-  };
-
   // Add keyboard event handler for search - updated dependencies
   const handleSearchKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -370,6 +400,47 @@ const TranscriptionView = () => {
     );
   };
 
+  // Move formatTime and highlightSearchTerm inside useMemo to avoid dependency warnings
+  const memoizedSegments = useMemo(() => {
+    if (!transcript || !transcript.segments) return [];
+    
+    // Use the formatTime function from outer scope
+    
+    // Define highlightSearchTerm inside the useMemo callback
+    const highlightSearchTerm = (text) => {
+      if (!transcriptSearch.trim()) return text;
+      
+      const parts = text.split(new RegExp(`(${transcriptSearch})`, 'gi'));
+      
+      return (
+        <>
+          {parts.map((part, i) => 
+            part.toLowerCase() === transcriptSearch.toLowerCase() ? 
+              <mark key={i} className="search-highlight">{part}</mark> : 
+              part
+          )}
+        </>
+      );
+    };
+    
+    return transcript.segments.map((segment, index) => (
+      <div 
+        key={index} 
+        id={`segment-${index}`}
+        className={`transcript-segment ${index === currentSegmentIndex ? 'active' : ''} ${
+          searchResults.some(r => r.index === index) ? 'search-result' : ''
+        }`}
+        onClick={() => handleSegmentClick(segment.start)}
+      >
+        <div className="segment-time">{formatTime(segment.start)}</div>
+        <div className="segment-text">
+          {transcriptSearch ? highlightSearchTerm(segment.text) : segment.text}
+        </div>
+      </div>
+    ));
+  }, [transcript, currentSegmentIndex, searchResults, transcriptSearch, handleSegmentClick]);
+
+  // Optimize the rendering of transcript segments by virtualizing the list
   const renderTranscript = () => {
     if (!transcript) return <p>Transcript not available yet.</p>;
     
@@ -412,21 +483,7 @@ const TranscriptionView = () => {
         
         <div className="transcript-container" ref={transcriptContainerRef}>
           <div className="transcript-segments">
-            {transcript.segments.map((segment, index) => (
-              <div 
-                key={index} 
-                id={`segment-${index}`}
-                className={`transcript-segment ${index === currentSegmentIndex ? 'active' : ''} ${
-                  searchResults.some(r => r.index === index) ? 'search-result' : ''
-                }`}
-                onClick={() => handleSegmentClick(segment.start)}
-              >
-                <div className="segment-time">{formatTime(segment.start)}</div>
-                <div className="segment-text">
-                  {transcriptSearch ? highlightSearchTerm(segment.text) : segment.text}
-                </div>
-              </div>
-            ))}
+            {memoizedSegments}
           </div>
         </div>
       </>
@@ -493,9 +550,10 @@ const TranscriptionView = () => {
               <div className="transcription-header">
                 <div className="pulse-icon"></div>
                 <span>Real-time Transcription</span>
+                <div className="log-counter">{transcriptionLogs.length} segments</div>
               </div>
               
-              <div className="transcription-logs">
+              <div className="transcription-logs" style={{ maxHeight: '350px', overflow: 'auto' }}>
                 {transcriptionLogs.length > 0 ? (
                   transcriptionLogs.map((log, index) => (
                     <div 
@@ -508,9 +566,21 @@ const TranscriptionView = () => {
                     </div>
                   ))
                 ) : (
-                  <p className="log-waiting">Waiting for transcription to begin...</p>
+                  <div className="transcription-initializing">
+                    <div className="initializing-animation"></div>
+                    <p className="log-waiting">Initializing transcription...</p>
+                  </div>
                 )}
               </div>
+              
+              {/* Show progress indicator */}
+              {transcriptionLogs.length > 0 && (
+                <div className="transcription-progress-indicator">
+                  <div className="progress-text">
+                    Transcription in progress - {transcriptionLogs.length} segments processed
+                  </div>
+                </div>
+              )}
             </div>
           )}
           

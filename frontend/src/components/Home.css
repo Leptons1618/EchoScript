@@ -141,6 +141,11 @@ body.dark .config-button {
   padding: 8px 16px;
   border-radius: 8px;
   background-color: rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.model-status-container:hover {
+  background-color: rgba(255, 255, 255, 0.25);
 }
 
 .status-spinner {
@@ -187,6 +192,9 @@ body.dark .config-button {
   color: white;
   font-size: 0.9rem;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @keyframes spin {
@@ -352,4 +360,72 @@ body.dark .config-modal-content select:hover {
 body.dark .config-modal-content select:focus {
   border-color: #60a5fa;
   box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+/* Style for the model name and size to make them stand out */
+.model-name {
+  font-weight: 600;
+  color: #ffffff;
+  background-color: rgba(79, 70, 229, 0.6);
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: capitalize;
+}
+
+.model-size {
+  font-weight: normal;
+  color: #ffffff;
+}
+
+/* Add a change model button */
+.change-model-btn {
+  background-color: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-left: 10px;
+}
+
+.change-model-btn:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Dark mode adjustments */
+body.dark .model-name {
+  background-color: rgba(96, 165, 250, 0.6);
+}
+
+/* Add styles for summarizer status info */
+.summarizer-info {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  font-style: italic;
+  background-color: rgba(79, 70, 229, 0.3);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+/* Dark mode version */
+body.dark .summarizer-info {
+  background-color: rgba(96, 165, 250, 0.3);
+}
+
+/* Enhanced model config modal */
+.config-modal-content label {
+  font-weight: 500;
+}
+
+.summarizer-option {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e5e7eb;
+}
+
+body.dark .summarizer-option {
+  border-top-color: #4b5563;
 }
