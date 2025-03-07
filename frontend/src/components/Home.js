@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Home.css';
-import cogGif from '../assets/icons8-cog.gif';
+// Replace the cog gif import with React Icons imports
+import { FiSettings } from 'react-icons/fi';
+import { FaFileAlt, FaChartBar, FaClock, FaSave } from 'react-icons/fa';
 
 const Home = () => {
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -159,7 +161,7 @@ const Home = () => {
       return (
         <div className="model-status-container">
           <div className="status-icon-warning">!</div>
-          <span className="status-text">No model loaded. Click ⚙️ to configure.</span>
+          <span className="status-text">No model loaded. Click <span role="img" aria-label="settings">⚙️</span> to configure.</span>
         </div>
       );
     }
@@ -196,7 +198,7 @@ const Home = () => {
             >
               {isSubmitting ? 'Processing...' : 'Transcribe'}
             </button>
-            {/* New config cog icon */}
+            {/* Replace cog gif with FiSettings icon */}
             <button 
               type="button" 
               className="config-button" 
@@ -205,12 +207,7 @@ const Home = () => {
               title="Configure Model"
               style={{ marginLeft: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             >
-              <img 
-                src={cogGif}
-                alt="Configure" 
-                className="config-icon" 
-                style={{ width: '24px', height: '24px' }}
-              />
+              <FiSettings className="config-icon" size={24} />
             </button>
           </div>
           {error && <p className="error-message">{error}</p>}
@@ -224,22 +221,26 @@ const Home = () => {
         <h2 style={{ fontSize: '1.5rem' }}>Advanced Features</h2>
         <div className="features-grid">
           <div className="feature-card">
-            <div className="feature-icon">📝</div>
+            {/* Replace emoji with icon */}
+            <div className="feature-icon"><FaFileAlt /></div>
             <h3 style={{ fontSize: '1.2rem' }}>Accurate Transcription</h3>
             <p>Powered by OpenAI's Whisper, our system delivers high-quality transcriptions</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📊</div>
+            {/* Replace emoji with icon */}
+            <div className="feature-icon"><FaChartBar /></div>
             <h3 style={{ fontSize: '1.2rem' }}>Smart Notes</h3>
             <p>AI-generated notes that capture key points and summarize content</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">⏱️</div>
+            {/* Replace emoji with icon */}
+            <div className="feature-icon"><FaClock /></div>
             <h3 style={{ fontSize: '1.2rem' }}>Time-Stamped</h3>
             <p>Navigate through transcripts with precise time markers</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">💾</div>
+            {/* Replace emoji with icon */}
+            <div className="feature-icon"><FaSave /></div>
             <h3 style={{ fontSize: '1.2rem' }}>Save & Export</h3>
             <p>Download transcripts and notes in multiple formats</p>
           </div>

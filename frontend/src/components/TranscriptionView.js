@@ -3,6 +3,15 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import './TranscriptionView.css';
+// Import icons from React Icons - removed unused imports
+import { 
+  FiSearch, FiX,
+  FiCheck, FiAlertTriangle 
+} from 'react-icons/fi';
+import { 
+  FaFilePdf, FaFileAlt, FaArrowUp, FaArrowDown, 
+  FaSpinner 
+} from 'react-icons/fa';
 
 const TranscriptionView = () => {
   const { jobId } = useParams();
@@ -658,7 +667,7 @@ const TranscriptionView = () => {
     return (
       <div className="processing-status">
         <div className="status-indicator">
-          <div className={`status-icon ${jobStatus.status}`}></div>
+          {renderStatusIcon(jobStatus.status)}
           <div className="status-text">{statusMessages[jobStatus.status] || jobStatus.status}</div>
         </div>
       </div>
@@ -712,38 +721,7 @@ const TranscriptionView = () => {
     return (
       <>
         <div className="transcript-search">
-          <div className="search-container">
-            <input
-              type="text"
-              value={transcriptSearch}
-              onChange={(e) => setTranscriptSearch(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="Search in transcript... (press Enter to search)"
-              className="search-input"
-            />
-            <button className="search-button" onClick={searchTranscript} title="Search (Enter)">
-              <span role="img" aria-label="search">🔍</span>
-            </button>
-            {searchResults.length > 0 && (
-              <div className="search-results-info">
-                <span>
-                  {currentSearchIndex + 1} of {searchResults.length} results
-                </span>
-                <button className="nav-button" onClick={prevSearchResult} title="Previous result (Shift+F3)">
-                  ↑
-                </button>
-                <button className="nav-button" onClick={nextSearchResult} title="Next result (F3 or Ctrl+G)">
-                  ↓
-                </button>
-                <button className="clear-button" onClick={clearSearch} title="Clear search (Esc)">
-                  ×
-                </button>
-                <div className="keyboard-shortcut">
-                  <kbd>F3</kbd> for next, <kbd>Shift+F3</kbd> for previous, <kbd>Esc</kbd> to clear
-                </div>
-              </div>
-            )}
-          </div>
+          {renderSearchControls()}
         </div>
         
         <div className="transcript-container" ref={transcriptContainerRef}>
@@ -867,6 +845,65 @@ const TranscriptionView = () => {
     );
   };
   
+  const renderExportButtons = () => (
+    <div className="export-options">
+      <button className="export-button" onClick={exportAsPDF}>
+        <FaFilePdf className="export-icon" />
+        Export as PDF
+      </button>
+      <button className="export-button" onClick={exportAsTXT}>
+        <FaFileAlt className="export-icon" />
+        Export as TXT
+      </button>
+    </div>
+  );
+
+  const renderSearchControls = () => (
+    <div className="search-container">
+      <input
+        type="text"
+        value={transcriptSearch}
+        onChange={(e) => setTranscriptSearch(e.target.value)}
+        onKeyDown={handleSearchKeyDown}
+        placeholder="Search in transcript... (press Enter to search)"
+        className="search-input"
+      />
+      <button className="search-button" onClick={searchTranscript} title="Search (Enter)">
+        <FiSearch />
+      </button>
+      {searchResults.length > 0 && (
+        <div className="search-results-info">
+          <span>
+            {currentSearchIndex + 1} of {searchResults.length} results
+          </span>
+          <button className="nav-button" onClick={prevSearchResult} title="Previous result (Shift+F3)">
+            <FaArrowUp />
+          </button>
+          <button className="nav-button" onClick={nextSearchResult} title="Next result (F3 or Ctrl+G)">
+            <FaArrowDown />
+          </button>
+          <button className="clear-button" onClick={clearSearch} title="Clear search (Esc)">
+            <FiX />
+          </button>
+          <div className="keyboard-shortcut">
+            <kbd>F3</kbd> for next, <kbd>Shift+F3</kbd> for previous, <kbd>Esc</kbd> to clear
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderStatusIcon = (status) => {
+    switch (status) {
+      case 'complete':
+        return <FiCheck className="status-icon complete" />;
+      case 'error':
+        return <FiAlertTriangle className="status-icon error" />;
+      default:
+        return <FaSpinner className="status-icon spinning" />;
+    }
+  };
+
   return (
     <div className="transcription-view">
       {error ? (
@@ -916,28 +953,7 @@ const TranscriptionView = () => {
                 {activeTab === 'transcript' ? renderTranscript() : renderNotes()}
               </div>
               
-              <div className="export-options">
-                <button className="export-button" onClick={exportAsPDF}>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                  </svg>
-                  Export as PDF
-                </button>
-                <button className="export-button" onClick={exportAsTXT}>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                  </svg>
-                  Export as TXT
-                </button>
-              </div>
+              {renderExportButtons()}
             </>
           )}
         </>

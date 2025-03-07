@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import './Navbar.css';
+// Import sun and moon icons
+import { FiSun, FiMoon } from 'react-icons/fi';
 
 const Navbar = () => {
   const [theme, setTheme] = useState('light');
@@ -42,9 +44,9 @@ const Navbar = () => {
       <div className="navbar-menu">
         <Link to="/" className="navbar-item">Home</Link>
         <Link to="/jobs" className="navbar-item">My Transcriptions</Link>
-        {/* Add theme toggle button */}
+        {/* Replace emoji with icons */}
         <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">
-          {theme === 'light' ? '🌙' : '☀️'}
+          {theme === 'light' ? <FiMoon /> : <FiSun />}
         </button>
       </div>
     </nav>
