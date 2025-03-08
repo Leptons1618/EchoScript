@@ -195,11 +195,13 @@ youtube-transcriber/
 
 1. **/api/transcribe:** POST request to transcribe a YouTube video
 2. **/api/job/<job_id>:** GET request to retrieve job status and results
-3. ...
+3. **/api/transcript/<job_id>:** GET request to retrieve transcript text
+4. **/api/notes/<job_id>:** GET request to retrieve notes and summaries
+5. **/api/jobs:** GET request to retrieve job history
+6. **/api/config:** GET/POST request to retrieve/update model configuration
+7. **/api/load_model:** POST request to load a specific model
+8. **/api/logs/<job_id>:** GET request to retrieve job logs
+9. **/api/save_theme:** POST request to save theme settings
 
 ## Demonstration Video
 [YouTube Video Transcriber Demo](https://github.com/Leptons1618/YT_Transcriber/blob/master/YT_Transcriber_Demo.mkv)
-
-<video width="320" height="240" controls
-  src="https://github.com/Leptons1618/YT_Transcriber/blob/master/YT_Transcriber_Demo.mkv" type="video/mkv">
-</video>

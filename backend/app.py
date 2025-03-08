@@ -1,15 +1,16 @@
 # Backend: Flask application with transcription and summarization
 
-# app.py
-
 # Standard Libraries
 import datetime
 import json
 import logging
 import os
+import re
 import threading
 import time
 import uuid
+
+# Set CUDA memory allocation configuration before importing PyTorch
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Third-Party Libraries
@@ -17,6 +18,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import nltk
 from nltk.tokenize import sent_tokenize
+import torch
 import whisper
 import yt_dlp
 from transformers import pipeline
@@ -77,14 +79,22 @@ CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 # Create a dictionary to store real-time transcription logs
 transcription_logs = {}
 
-# Add a function to append to transcription logs
+# Modify the append_transcription_log function to be more efficient
 def append_transcription_log(job_id, text):
     if job_id not in transcription_logs:
         transcription_logs[job_id] = []
-    transcription_logs[job_id].append(text)
-    # Keep only the latest 50 logs
-    if len(transcription_logs[job_id]) > 50:
-        transcription_logs[job_id] = transcription_logs[job_id][-50:]
+    
+    # Add timestamp to logs for UI only (no terminal logging)
+    timestamp = datetime.datetime.now().strftime('%H:%M:%S')
+    log_entry = f"{timestamp} - {text}"
+    transcription_logs[job_id].append(log_entry)
+    
+    # Keep only the latest 100 logs to prevent memory bloat
+    if len(transcription_logs[job_id]) > 100:
+        transcription_logs[job_id] = transcription_logs[job_id][-100:]
+    
+    # Don't log transcriptions to terminal as they're too verbose
+    # Only log critical events to the terminal/logfile
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_video():
@@ -211,7 +221,7 @@ def get_model_path(model_type):
     os.makedirs(path, exist_ok=True)
     return path
 
-# Modify transcribe_audio to log segments as they're transcribed
+# Fix transcribe_audio function for better performance
 def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
     global transcription_model, current_whisper_model_size
     logger.info(f"Transcribing audio with {model_type} model ({model_size}) from {audio_path}")
@@ -219,39 +229,118 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
     if not os.path.exists(audio_path):
         logger.error(f"Audio file not found: {audio_path}")
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
+    
+    # Extract job_id and log the start of transcription immediately
+    job_id = os.path.basename(audio_path).split('.')[0]
+    append_transcription_log(job_id, "Transcription started...")
+    
+    # Get audio duration for progress reporting
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 
+             'default=noprint_wrappers=1:nokey=1', audio_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+        audio_duration = float(result.stdout)
+        logger.info(f"Audio duration: {audio_duration:.2f} seconds")
+    except Exception:
+        audio_duration = 0
+        logger.warning("Couldn't determine audio duration")
+
     if model_type == "faster-whisper":
         from faster_whisper import WhisperModel
         model_path = get_model_path("faster-whisper")
-        logger.info(f"Loading Faster-Whisper {model_size} model from {model_path}...")
-        faster_model = WhisperModel(model_size, device="cuda", compute_type="float16", download_root=model_path)
-        result = faster_model.transcribe(audio_path)
-        logger.info("Faster-Whisper transcription complete")
-        # Faster-whisper returns a tuple, not a dictionary
-        # The first element of the tuple is the segments generator
-        segments = list(result[0])
-        # Log segments as they're transcribed
-        job_id = os.path.basename(audio_path).split('.')[0]  # Extract job_id from filename
-        for segment in segments:
-            append_transcription_log(job_id, f"{formatTime(segment.start)} - {segment.text}")
-        # Extract text from segments
-        transcript = " ".join([segment.text for segment in segments])
-        # Convert segments to format expected by frontend
-        formatted_segments = [{"text": segment.text, "start": segment.start, "end": segment.end} for segment in segments]
-        return transcript, formatted_segments
+        
+        # Initialize the model with optimized settings
+        logger.info(f"Loading Faster-Whisper {model_size} model")
+        try:
+            # Optimize VRAM usage with compute_type and better options
+            faster_model = WhisperModel(
+                model_size, 
+                device="cuda", 
+                compute_type="float16", 
+                download_root=model_path,
+                cpu_threads=4,  # Use 4 CPU threads to help with preprocessing
+                num_workers=2   # Use 2 workers for DataLoader
+            )
+            
+            # Use efficient batched processing
+            logger.info(f"Starting transcription for job {job_id}")
+            segments = []
+            segment_count = 0
+            last_log_time = time.time()
+            
+            # Process segments with optimization options
+            for segment in faster_model.transcribe(
+                audio_path,
+                beam_size=5,           # Beam size (quality vs speed tradeoff)
+                vad_filter=True,       # Voice activity detection for better segment detection
+                vad_parameters=dict(min_silence_duration_ms=500),  # Skip silences > 500ms
+            )[0]:
+                segment_count += 1
+                segments.append(segment)
+                
+                # Format and log each segment but don't flood logs
+                formatted_time = formatTime(segment.start)
+                log_message = f"{formatted_time} - {segment.text}"
+                append_transcription_log(job_id, log_message)
+                
+                # Report progress every 10 seconds
+                current_time = time.time()
+                if (current_time - last_log_time) > 10:
+                    progress = min(100, int((segment.end / audio_duration * 100) if audio_duration else 0))
+                    logger.info(f"Job {job_id}: Transcription progress ~{progress}% ({segment_count} segments)")
+                    last_log_time = current_time
+            
+            logger.info(f"Job {job_id}: Transcription complete with {segment_count} segments")
+            
+            # Create optimized output
+            transcript = " ".join([s.text for s in segments])
+            formatted_segments = [{"text": s.text, "start": s.start, "end": s.end} for s in segments]
+            return transcript, formatted_segments
+        
+        except Exception as e:
+            logger.error(f"Error in transcription: {str(e)}")
+            raise
+    
     else:
-        # For Whisper:
+        # For OpenAI Whisper model
         if transcription_model is None:
             errorMsg = "No Whisper model loaded. Please configure and load a model first."
             logger.error(errorMsg)
             raise Exception(errorMsg)
-        # Use the already loaded model without reloading.
-        result = transcription_model.transcribe(audio_path)
-        logger.info("Whisper transcription complete")
-        # Log segments as they're transcribed
-        job_id = os.path.basename(audio_path).split('.')[0]
-        for segment in result["segments"]:
-            append_transcription_log(job_id, f"{formatTime(segment['start'])} - {segment['text']}")
-        return result["text"], result["segments"]
+        
+        # Start transcription
+        logger.info(f"Starting OpenAI Whisper transcription for job {job_id}")
+        append_transcription_log(job_id, "Starting OpenAI Whisper transcription...")
+        
+        try:
+            # Use the already loaded model with optimized settings
+            result = transcription_model.transcribe(
+                audio_path,
+                fp16=True,         # Use float16 for better performance
+                beam_size=5,       # Beam search with 5 beams (quality vs speed tradeoff)
+                best_of=5          # Return best of 5 candidates
+            )
+            
+            # Log some segments for UI display without flooding logs
+            total_segments = len(result["segments"])
+            log_interval = max(1, total_segments // 20)  # log ~20 segments
+            
+            for i, segment in enumerate(result["segments"]):
+                if i % log_interval == 0 or i == total_segments - 1:
+                    formatted_time = formatTime(segment['start'])
+                    log_message = f"{formatted_time} - {segment['text']}"
+                    append_transcription_log(job_id, log_message)
+            
+            logger.info(f"Job {job_id}: Whisper transcription complete with {total_segments} segments")
+            return result["text"], result["segments"]
+            
+        except Exception as e:
+            logger.error(f"Error in Whisper transcription: {str(e)}")
+            raise
 
 # Helper function to format time
 def formatTime(seconds):
@@ -259,106 +348,349 @@ def formatTime(seconds):
     secs = int(seconds % 60)
     return f"{minutes}:{secs:02d}"
 
+# Optimize the notes generation for better performance
 def generate_notes(transcript):
     logger.info("Generating notes from transcript")
     
     # Check if summarizer is available
     global summarizer
     if summarizer is None:
-        logger.warning("Summarizer model is not available. Using original transcript as summary.")
+        logger.warning("Summarizer not available, returning basic summary")
         return {
-            "summary": transcript,
-            "key_points": [],
+            "summary": transcript[:1000] + "...",  # Basic truncation as fallback
+            "key_points": ["No key points could be generated. Please try again."],
             "original_transcript": transcript
         }
     
     try:
+        # Optimize for performance by creating smarter chunks
         sentences = sent_tokenize(transcript)
         chunks = []
         current_chunk = ""
-        # Create chunks of roughly 1000 characters for summarization
+        
+        # Create chunks of roughly 900-1000 characters for summarization
         for sentence in sentences:
-            if len(current_chunk) + len(sentence) < 1000:
+            if len(current_chunk) + len(sentence) < 900:
                 current_chunk += " " + sentence
             else:
-                chunks.append(current_chunk.strip())
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
                 current_chunk = sentence
+        
         if current_chunk:
             chunks.append(current_chunk.strip())
         
-        summaries = []
-        for chunk in chunks:
-            if len(chunk) < 50:  # Skip very short chunks
-                continue
-            summary = summarizer(chunk, max_length=100, min_length=30, do_sample=False)
-            summaries.append(summary[0]['summary_text'])
+        # Skip very short chunks and process in batches for efficiency
+        valid_chunks = [chunk for chunk in chunks if len(chunk) >= 50]
         
+        # Log information for debugging
+        logger.info(f"Processing {len(valid_chunks)} chunks for summarization")
+        if len(valid_chunks) == 0:
+            logger.warning("No valid chunks found for summarization")
+            return {
+                "summary": transcript[:1000] + "...",
+                "key_points": ["Transcript too short for key point extraction."],
+                "original_transcript": transcript
+            }
+        
+        # Process in small batches to avoid OOM errors
+        batch_size = 2
+        batched_chunks = [valid_chunks[i:i+batch_size] for i in range(0, len(valid_chunks), batch_size)]
+        
+        # Log batching information
+        logger.info(f"Created {len(batched_chunks)} batches of size {batch_size}")
+        
+        all_summaries = []
+        successful_batches = 0
+        
+        for batch_idx, batch in enumerate(batched_chunks):
+            try:
+                # Process each batch with optimized parameters
+                logger.info(f"Processing batch {batch_idx+1}/{len(batched_chunks)}")
+                summaries = summarizer(
+                    batch, 
+                    max_length=150,  # Increased max length
+                    min_length=30,
+                    do_sample=True,  # Enable sampling for variety
+                    temperature=1.0,  # Add temperature for more diverse output
+                    num_beams=4,      # Use beam search for better quality
+                    truncation=True
+                )
+                all_summaries.extend([s['summary_text'] for s in summaries])
+                successful_batches += 1
+                
+                # Log success message
+                logger.info(f"Successfully processed batch {batch_idx+1}")
+                
+            except Exception as e:
+                logger.error(f"Error in batch summarization for batch {batch_idx+1}: {str(e)}")
+                # Skip failed batches
+                continue
+        
+        if len(all_summaries) == 0:
+            logger.error("No summaries were generated successfully")
+            return {
+                "summary": "Failed to generate a summary.",
+                "key_points": ["Failed to extract key points from the transcript."],
+                "original_transcript": transcript
+            }
+        
+        logger.info(f"Generated {len(all_summaries)} summaries from {successful_batches} batches")
+        
+        # Improved key point extraction with better sentence parsing
         key_points = []
-        for summary in summaries:
-            points = sent_tokenize(summary)
-            key_points.extend(points)
+        for summary in all_summaries:
+            # First try to find sentences that look like bullet points or key facts
+            important_patterns = [
+                r'(?:^|\n)(?:\d+\.\s|\*\s|\-\s)(.+?)(?=$|\n)',  # Numbered/bulleted points
+                r'(?:Key|Important|Main)(?:\s+point|\s+takeaway|\s+idea|\s+concept|\s+fact)(?:s)?(?:\s+include|\s+is|\s+are)?(?:\s*:)?\s+(.+?)(?:$|\n|\.)',  # "Key point is..." patterns
+                r'(?:First|Second|Third|Fourth|Fifth|Finally|Lastly)(?:\s*,)?\s+(.+?)(?:$|\n|\.)'  # Ordinal markers
+            ]
+            
+            for pattern in important_patterns:
+                matches = re.finditer(pattern, summary, re.IGNORECASE | re.MULTILINE)
+                for match in matches:
+                    if match.group(1).strip():
+                        point = match.group(1).strip()
+                        # Ensure the point ends with proper punctuation
+                        if not point.endswith(('.', '!', '?')):
+                            point += '.'
+                        key_points.append(point)
+            
+            # If we haven't found at least 2 points with patterns, use regular sentence tokenization
+            if len(key_points) < 2:
+                points = sent_tokenize(summary)
+                # Filter for longer, more informative sentences
+                for point in points:
+                    point = point.strip()
+                    word_count = len(point.split())
+                    # Only include points that are reasonably long but not too long
+                    if 5 <= word_count <= 25 and len(point) >= 50:
+                        key_points.append(point)
+        
+        # Deduplicate points with lower similarity threshold
+        unique_points = []
+        for point in key_points:
+            if not any(similar(point, existing, threshold=0.7) for existing in unique_points):
+                unique_points.append(point)
+        
+        logger.info(f"Generated {len(unique_points)} unique key points")
+        
+        # If we still don't have enough key points, extract sentences from the transcript
+        if len(unique_points) < 3:
+            logger.info("Not enough key points extracted, falling back to direct transcript extraction")
+            # Extract some sentences directly from transcript
+            important_sentences = extract_important_sentences(transcript)
+            for sentence in important_sentences:
+                if not any(similar(sentence, existing, threshold=0.7) for existing in unique_points):
+                    unique_points.append(sentence)
+        
+        # If we still have no key points, add a default message
+        if len(unique_points) == 0:
+            unique_points = ["No key points could be automatically extracted from this transcript."]
         
         notes = {
-            "summary": " ".join(summaries),
-            "key_points": key_points,
+            "summary": " ".join(all_summaries),
+            "key_points": unique_points[:10],  # Limit to top 10 points
             "original_transcript": transcript
         }
-        logger.info("Notes generated successfully")
+        logger.info(f"Notes generation complete: {len(notes['key_points'])} key points")
         return notes
+        
     except Exception as e:
-        logger.error(f"Error in note generation: {str(e)}")
-        # Fallback: return original transcript if summarization fails
+        logger.error(f"Error in note generation: {str(e)}", exc_info=True)
+        # Fallback
         return {
-            "summary": transcript,
-            "key_points": [],
+            "summary": transcript[:1000] + "...",
+            "key_points": ["Could not generate key points due to an error."],
             "original_transcript": transcript
         }
+
+# Helper function to extract important sentences directly from transcript
+def extract_important_sentences(transcript):
+    # Look for sentences that contain signal phrases that suggest importance
+    important_markers = [
+        "important", "significant", "key", "critical", "crucial", "essential",
+        "main point", "highlight", "takeaway", "conclusion", "in summary",
+        "to summarize", "noteworthy", "remember", "notably", "specifically"
+    ]
+    
+    sentences = sent_tokenize(transcript)
+    important_sentences = []
+    
+    for sentence in sentences:
+        lower_sentence = sentence.lower()
+        
+        # Check if the sentence contains any important markers
+        if any(marker in lower_sentence for marker in important_markers):
+            important_sentences.append(sentence)
+            
+        # Also include sentences that are within a good information density range
+        # (not too short, not too verbose)
+        elif 100 <= len(sentence) <= 200 and len(sentence.split()) >= 10:
+            important_sentences.append(sentence)
+    
+    # Limit to 5 sentences to avoid overwhelming the key points section
+    return important_sentences[:5]
+
+# Helper function to check if two strings are very similar - adjusted threshold
+def similar(str1, str2, threshold=0.7):  # Reduced threshold from 0.8 to 0.7
+    # First check: if lengths are very different, they're not similar
+    if abs(len(str1) - len(str2)) / max(len(str1), len(str2)) > (1 - threshold):
+        return False
+    
+    # Improved similarity check using word-based comparison instead of character-based
+    words1 = set(str1.lower().split())
+    words2 = set(str2.lower().split())
+    
+    # Calculate Jaccard similarity
+    intersection = len(words1.intersection(words2))
+    union = len(words1.union(words2))
+    
+    if union == 0:  # Edge case
+        return False
+        
+    similarity = intersection / union
+    return similarity > threshold
+
+# Add support for multiple summarizer models with variable weight sizes
+SUMMARIZER_MODELS = {
+    "bart-large-cnn": {"name": "facebook/bart-large-cnn", "size": "1.6GB", "description": "High quality but requires more memory"},
+    "bart-base-cnn": {"name": "sshleifer/distilbart-cnn-6-6", "size": "680MB", "description": "Good balance of quality and speed"},
+    "t5-small": {"name": "t5-small", "size": "300MB", "description": "Fast but less detailed summaries"},
+    "flan-t5-small": {"name": "google/flan-t5-small", "size": "300MB", "description": "Improved small model with instruction tuning"},
+    "distilbart-xsum": {"name": "sshleifer/distilbart-xsum-12-1", "size": "400MB", "description": "Efficient model focused on extreme summarization"}
+}
+
+# Global variable to store current summarizer model name
+current_summarizer_model = "bart-large-cnn"
+summarizer = None   # Will store the loaded summarizer model
+
+def load_summarizer(model_name=None):
+    """Load summarizer model with fallback options if primary model fails"""
+    global summarizer, current_summarizer_model
+    
+    # Use specified model or current model
+    model_name = model_name or current_summarizer_model
+    current_summarizer_model = model_name  # Update current model name
+    
+    logger.info(f"Loading summarization model: {model_name}")
+    
+    if model_name not in SUMMARIZER_MODELS:
+        logger.error(f"Unknown summarizer model: {model_name}, fallback to bart-base-cnn")
+        model_name = "bart-base-cnn"
+    
+    try:
+        # Try loading on GPU first with half precision
+        if torch.cuda.is_available():
+            logger.info("Attempting to load summarizer on GPU with half precision")
+            summarizer = pipeline(
+                "summarization", 
+                model=SUMMARIZER_MODELS[model_name]["name"],
+                device=0,
+                torch_dtype=torch.float16
+            )
+            logger.info(f"Summarization model {model_name} loaded successfully on GPU")
+            return True
+        else:
+            # CPU fallback
+            logger.info("GPU not available, loading summarizer on CPU")
+            summarizer = pipeline(
+                "summarization", 
+                model=SUMMARIZER_MODELS[model_name]["name"],
+                device=-1
+            )
+            logger.info(f"Summarization model {model_name} loaded successfully on CPU")
+            return True
+    except Exception as e:
+        logger.error(f"Error loading primary summarizer model: {str(e)}")
+        
+        # Try fallback models if primary fails
+        fallback_models = ["bart-base-cnn", "t5-small", "flan-t5-small", "distilbart-xsum"]
+        for fallback_model in fallback_models:
+            if fallback_model == model_name:
+                continue  # Skip if this is the one that just failed
+                
+            try:
+                logger.info(f"Trying fallback summarizer model: {fallback_model}")
+                summarizer = pipeline(
+                    "summarization", 
+                    model=SUMMARIZER_MODELS[fallback_model]["name"],
+                    device=-1  # Use CPU for fallback to be safe
+                )
+                logger.info(f"Fallback summarizer {fallback_model} loaded successfully")
+                current_summarizer_model = fallback_model
+                return True
+            except Exception as ex:
+                logger.error(f"Error loading fallback summarizer {fallback_model}: {str(ex)}")
+        
+        # If all models fail
+        logger.error("All summarization models failed to load")
+        summarizer = None
+        return False
 
 @app.route('/api/load_model', methods=['POST'])
 def load_model_config():
     data = request.json
     model_type = data.get('model_type', 'whisper')
     model_size = data.get('model_size', 'medium')
+    summarizer_model = data.get('summarizer_model', current_summarizer_model)
+    
     # Save config first before PyTorch operations
     with open(CONFIG_FILE, 'w') as f:
-        json.dump({"model_type": model_type, "model_size": model_size}, f)
-    global transcription_model, current_whisper_model_size, summarizer
+        json.dump({
+            "model_type": model_type, 
+            "model_size": model_size, 
+            "summarizer_model": summarizer_model
+        }, f)
     
-    # Load summarization model regardless of whisper/faster-whisper selection
-    logger.info("Loading summarization model: facebook/bart-large-cnn...")
-    try:
-        summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-        if summarizer is not None:
-            logger.info("Summarization model loaded successfully: facebook/bart-large-cnn")
-        else:
-            logger.error("Failed to load summarization model: facebook/bart-large-cnn")
-    except Exception as e:
-        logger.error(f"Error loading summarization model: {str(e)}")
-        summarizer = None
+    global transcription_model, current_whisper_model_size
+    
+    # Load summarization model
+    load_summarizer(summarizer_model)
     
     # Continue with loading the appropriate transcription model
     if model_type == "whisper":
+        # Clear GPU memory before loading new model
         if 'transcription_model' in globals() and transcription_model is not None:
-            logger.info("Disallocating current Whisper model...")
+            logger.info("Unloading previous Whisper model")
             del transcription_model
             import gc; gc.collect()
             import torch
             torch.cuda.empty_cache()
-            time.sleep(2)  # Allow GPU memory to release
-            logger.info("CUDA memory after empty_cache: allocated=%s, reserved=%s" % (torch.cuda.memory_allocated(), torch.cuda.memory_reserved()))
-        logger.info(f"Loading Whisper {model_size} model as per configuration...")
+            time.sleep(1)  # Allow GPU memory to release
+        
+        logger.info(f"Loading Whisper {model_size} model")
         model_path = get_model_path("whisper")
-        transcription_model = whisper.load_model(model_size, download_root=model_path)
+        
+        # Load with optimized settings
+        transcription_model = whisper.load_model(
+            model_size, 
+            download_root=model_path,
+            device="cuda" if torch.cuda.is_available() else "cpu"
+        )
         current_whisper_model_size = model_size
         logger.info(f"Completed loading Whisper {model_size} model")
+        
     elif model_type == "faster-whisper":
         from faster_whisper import WhisperModel
         model_path = get_model_path("faster-whisper")
-        _ = WhisperModel(model_size, device="cuda", compute_type="float16", download_root=model_path)
-        logger.info(f"Completed loading Faster-Whisper {model_size} model")
+        logger.info(f"Loading Faster-Whisper {model_size} model")
+        
+        # We'll load the model on demand to save memory
+        # Just verify the model can be downloaded/accessed
+        _ = WhisperModel(
+            model_size, 
+            device="cuda", 
+            compute_type="float16", 
+            download_root=model_path,
+            cpu_threads=4
+        )
+        logger.info(f"Verified Faster-Whisper {model_size} model")
     else:
         return jsonify({"error": "Invalid model type"}), 400
-    return jsonify({"message": f"{model_type.capitalize()} model {model_size} loaded"}), 200
+    
+    return jsonify({"message": f"{model_type.capitalize()} model {model_size} loaded with {summarizer_model} summarizer"}), 200
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
@@ -366,9 +698,23 @@ def get_config():
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
     else:
-        config = {"model_type": "whisper", "model_size": "medium", "theme": "light"}
-    # Add model_status to indicate whether a model is loaded
+        config = {
+            "model_type": "whisper", 
+            "model_size": "medium", 
+            "theme": "light",
+            "summarizer_model": "bart-large-cnn"
+        }
+    
+    # Add model_status to indicate whether models are loaded
     config["model_status"] = "loaded" if transcription_model is not None else "no model loaded"
+    config["summarizer_status"] = "loaded" if summarizer is not None else "no summarizer loaded"
+    
+    # Add available summarizer models to the config
+    config["available_summarizers"] = SUMMARIZER_MODELS
+    
+    # Add current summarizer model
+    config["summarizer_model"] = current_summarizer_model
+    
     return jsonify(config), 200
 
 # Add a new endpoint to save theme preference
