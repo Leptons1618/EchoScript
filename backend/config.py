@@ -21,7 +21,10 @@ for directory in [AUDIO_DIR, TRANSCRIPT_DIR, NOTES_DIR, MODEL_DIR, LOG_DIR]:
 CONFIG_FILE = os.path.join(BACKEND_DIR, "config.json")
 
 # Set CUDA memory allocation configuration
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
+# Also set this environment variable to avoid CUDA memory allocation issues
+os.environ["TRANSFORMERS_OFFLINE"] = "0"  # Allow downloading if needed
+os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Avoid parallelism warnings
 
 # Logging configuration
 log_filename = os.path.join(LOG_DIR, f"session_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log")

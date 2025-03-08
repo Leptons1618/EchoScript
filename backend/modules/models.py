@@ -4,10 +4,14 @@ import gc
 import time
 import os
 import json
-from transformers import pipeline
+import traceback
+from transformers import pipeline, AutoModelForSeq2SeqLM, AutoTokenizer
 from config import logger, SUMMARIZER_MODELS, MODEL_DIR, CONFIG_FILE
 import config
 from modules.utils import get_model_path
+
+# Set CUDA memory allocation configuration - update the existing setting
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
 def load_whisper_model(model_size="medium"):
     """Load the OpenAI Whisper model"""

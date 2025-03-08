@@ -6,7 +6,7 @@ import './TranscriptionView.css';
 // Import icons from React Icons - removed unused imports
 import { 
   FiSearch, FiX,
-  FiCheck, FiAlertTriangle 
+  FiCheck, FiAlertTriangle, FiSettings 
 } from 'react-icons/fi';
 import { 
   FaFilePdf, FaFileAlt, FaArrowUp, FaArrowDown, 
@@ -47,6 +47,15 @@ const TranscriptionView = () => {
   
   // Add new state for tracking export completion
   const [notionExported, setNotionExported] = useState(false);
+  
+  // Add state for regenerating summary
+  const [isRegeneratingNotes, setIsRegeneratingNotes] = useState(false);
+  const [regenerationError, setRegenerationError] = useState('');
+  
+  // Add state for summarizer model selection
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [availableSummarizers, setAvailableSummarizers] = useState({});
+  const [selectedSummarizerModel, setSelectedSummarizerModel] = useState('');
   
   // Extract YouTube Video ID from URL
   const extractYoutubeId = useCallback((url) => {
@@ -801,7 +810,30 @@ const TranscriptionView = () => {
     return (
       <div className="notes-container">
         <div className="notes-section">
-          <h3>Summary</h3>
+          <div className="notes-header">
+            <h3>Summary</h3>
+            <div className="notes-actions">
+              <button 
+                className="model-select-button"
+                onClick={() => setShowModelSelector(true)}
+                title="Select summarizer model"
+                disabled={isRegeneratingNotes}
+              >
+                <FiSettings />
+              </button>
+              <button 
+                className="regenerate-button"
+                onClick={regenerateNotes}
+                disabled={isRegeneratingNotes}
+                title="Generate new summary from transcript"
+              >
+                {isRegeneratingNotes ? 'Regenerating...' : 'Generate Again'}
+              </button>
+            </div>
+          </div>
+          {regenerationError && (
+            <div className="regeneration-error">{regenerationError}</div>
+          )}
           <p>{notes.summary}</p>
         </div>
         
@@ -1196,6 +1228,7 @@ const TranscriptionView = () => {
       )}
       {/* Add modal at the end of the component */}
       {renderNotionModal()}
+      {renderModelSelectorModal()}
       
       <footer style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.9rem', color: '#6b7280' }}>
         Created by Lept0n5
