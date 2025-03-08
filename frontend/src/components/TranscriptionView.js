@@ -1,5 +1,5 @@
 // src/components/TranscriptionView.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import './TranscriptionView.css';
@@ -11,18 +11,57 @@ const TranscriptionView = () => {
   const [notes, setNotes] = useState(null);
   const [activeTab, setActiveTab] = useState('transcript');
   const [error, setError] = useState('');
-  const [progress, setProgress] = useState(0);
-  const [logs, setLogs] = useState([]);
+  const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
+  const [videoId, setVideoId] = useState(null);
+  const playerRef = useRef(null);
+  const transcriptContainerRef = useRef(null);
   const prevStatusRef = useRef('');
+  const [transcriptionLogs, setTranscriptionLogs] = useState([]);
+  const logInterval = useRef(null);
+  const [statusHistory, setStatusHistory] = useState([]); // Renamed from logs
   
-  // Determine target progress based on status
-  const getTargetProgress = (status) => {
-    switch(status) {
-      case 'downloading': return 20;
-      case 'transcribing': return 90;  // heavy phase gets more range
-      case 'generating_notes': return 100;
-      case 'complete': return 100;
-      default: return 0;
+  // New state for transcript search
+  const [transcriptSearch, setTranscriptSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  
+  // Extract YouTube Video ID from URL
+  const extractYoutubeId = useCallback((url) => {
+    if (!url) return null;
+    
+    // Fixed regex pattern
+    const regExp = /^.*(youtu.be\/|v\/|e\/|u\/\w+\/|embed\/|v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  }, []);
+  
+  // Scroll to a specific segment
+  const scrollToSegment = useCallback((index) => {
+    const segmentEl = document.getElementById(`segment-${index}`);
+    if (segmentEl && transcriptContainerRef.current) {
+      const containerRect = transcriptContainerRef.current.getBoundingClientRect();
+      const segmentRect = segmentEl.getBoundingClientRect();
+      
+      if (segmentRect.top < containerRect.top || segmentRect.bottom > containerRect.bottom) {
+        segmentEl.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }
+    }
+  }, []);
+  
+  // Update current segment based on video time and scroll to it
+  const updateCurrentSegment = useCallback((currentTime) => {
+    if (!transcript || !transcript.segments) return;
+    
+    const segmentIndex = transcript.segments.findIndex(seg => 
+      currentTime >= seg.start && currentTime < seg.end
+    );
+    
+    if (segmentIndex !== -1 && segmentIndex !== currentSegmentIndex) {
+      setCurrentSegmentIndex(segmentIndex);
+      scrollToSegment(segmentIndex);
     }
   }, [transcript, currentSegmentIndex, scrollToSegment]);
   
@@ -80,6 +119,12 @@ const TranscriptionView = () => {
         if (transcriptResponse.ok) {
           const transcriptData = await transcriptResponse.json();
           setTranscript(transcriptData);
+          
+          // Extract video ID from youtube_url 
+          if (!videoId && transcriptData.youtube_url) {
+            const id = extractYoutubeId(transcriptData.youtube_url);
+            if (id) setVideoId(id);
+          }
         }
         
         // Fetch notes
@@ -120,7 +165,7 @@ const TranscriptionView = () => {
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [jobId, jobStatus.status]);
+  }, [jobId, jobStatus.status, videoId, extractYoutubeId]);
   
   // Initialize YouTube player once we have a video ID
   useEffect(() => {
@@ -188,22 +233,37 @@ const TranscriptionView = () => {
   
   // Calculate and update time estimate
   useEffect(() => {
-    if (progress > 0 && progress < 100) {
-      const elapsedMs = Date.now() - startTimeRef.current;
-      const estimatedTotalMs = (elapsedMs / progress) * 100;
-      const remainingMs = estimatedTotalMs - elapsedMs;
-      const remainingMinutes = Math.ceil(remainingMs / 60000);
-      setTimeEstimate(remainingMinutes);
-    }
-  }, [progress]);
-  
-  // Log status changes for background display with timestamps
-  useEffect(() => {
     if (prevStatusRef.current !== jobStatus.status) {
-      setLogs(prev => [...prev, `Status changed to: ${jobStatus.status}`]);
+      setStatusHistory(prev => [...prev, `Status changed to: ${jobStatus.status}`]);
       prevStatusRef.current = jobStatus.status;
     }
   }, [jobStatus.status]);
+
+  // Fetch transcription logs while processing
+  useEffect(() => {
+    if (jobStatus.status === 'transcribing') {
+      // Start polling for real-time transcription logs
+      logInterval.current = setInterval(async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/logs/${jobId}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.logs && data.logs.length > 0) {
+              setTranscriptionLogs(data.logs);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching logs:', err);
+        }
+      }, 2000);
+      
+      return () => {
+        if (logInterval.current) {
+          clearInterval(logInterval.current);
+        }
+      };
+    }
+  }, [jobId, jobStatus.status]);
   
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -333,7 +393,7 @@ const TranscriptionView = () => {
       <div className="processing-status">
         <div className="status-indicator">
           <div className={`status-icon ${jobStatus.status}`}></div>
-          <div className="status-text">{statusMessages[jobStatus.status] || jobStatus.status} ({progress}%)</div>
+          <div className="status-text">{statusMessages[jobStatus.status] || jobStatus.status}</div>
         </div>
       </div>
     );
@@ -576,22 +636,6 @@ const TranscriptionView = () => {
           )}
         </>
       )}
-      {/* Conditionally render log-display only when not complete and not error */}
-      {jobStatus.status !== 'complete' && jobStatus.status !== 'error' && (
-        <div className="log-display" style={{
-          marginTop: '20px',
-          fontSize: '0.8rem',
-          color: '#666',
-          background: '#f9f9f9',
-          padding: '10px',
-          borderRadius: '6px',
-          maxHeight: '150px',
-          overflowY: 'auto'
-        }}>
-          {logs.map((msg, index) => <div key={index}>{msg}</div>)}
-        </div>
-      )}
-      {/* Footer */}
       <footer style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.9rem', color: '#6b7280' }}>
         Created by Lept0n5
       </footer>
