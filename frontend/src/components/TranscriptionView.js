@@ -1172,6 +1172,124 @@ const TranscriptionView = () => {
     return languages[code] || code;
   };
 
+  // Add regenerateNotes function before the return statement
+const regenerateNotes = async () => {
+  setIsRegeneratingNotes(true);
+  setRegenerationError('');
+  
+  try {
+    const response = await fetch(`http://localhost:5000/api/regenerate_notes/${jobId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: selectedSummarizerModel || undefined
+      }),
+    });
+    
+    if (response.ok) {
+      const newNotes = await response.json();
+      setNotes(newNotes);
+      // Show success message or notification here if desired
+    } else {
+      const errorData = await response.json();
+      setRegenerationError(errorData.error || 'Failed to regenerate notes');
+    }
+  } catch (err) {
+    setRegenerationError('Error connecting to server');
+    console.error(err);
+  } finally {
+    setIsRegeneratingNotes(false);
+    setShowModelSelector(false); // Close the model selector if open
+  }
+};
+
+// Add renderModelSelectorModal function before the return statement
+const renderModelSelectorModal = () => {
+  if (!showModelSelector) return null;
+  
+  return (
+    <div className="notion-modal-overlay show" onClick={() => setShowModelSelector(false)}>
+      <div className="notion-modal" onClick={e => e.stopPropagation()}>
+        <h3>Select Summarization Model</h3>
+        
+        <div className="notion-form">
+          <div className="form-group">
+            <label htmlFor="summarizer-model">Choose a model:</label>
+            <select
+              id="summarizer-model"
+              value={selectedSummarizerModel}
+              onChange={(e) => setSelectedSummarizerModel(e.target.value)}
+              className="model-selector"
+            >
+              <option value="">Default</option>
+              {Object.keys(availableSummarizers).map(key => (
+                <option key={key} value={key} className={
+                  transcript?.language && availableSummarizers[key]?.languages?.includes(transcript.language)
+                    ? 'specialized-option'
+                    : ''
+                }>
+                  {key.includes('/') ? key.split('/')[1] : key}
+                  {transcript?.language && availableSummarizers[key]?.languages?.includes(transcript.language) && ' ★'}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          {selectedSummarizerModel && availableSummarizers[selectedSummarizerModel] && (
+            <div className="model-info">
+              <p>{availableSummarizers[selectedSummarizerModel].description}</p>
+              {transcript?.language && availableSummarizers[selectedSummarizerModel]?.languages?.includes(transcript.language) && (
+                <p className="language-match">
+                  <span role="img" aria-label="Star">⭐</span> Optimized for {transcript.language}
+                </p>
+              )}
+            </div>
+          )}
+          
+          <div className="notion-actions">
+            <button 
+              className="notion-cancel" 
+              onClick={() => setShowModelSelector(false)}
+            >
+              Cancel
+            </button>
+            <button 
+              className="notion-submit" 
+              onClick={() => {
+                regenerateNotes();
+              }}
+              disabled={isRegeneratingNotes}
+            >
+              {isRegeneratingNotes ? 'Regenerating...' : 'Regenerate Notes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Also add a useEffect to load available summarizers
+useEffect(() => {
+  const fetchSummarizers = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/config');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.available_summarizers) {
+          setAvailableSummarizers(data.available_summarizers);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching summarizer models:', error);
+    }
+  };
+  
+  fetchSummarizers();
+}, []); // Run once on component mount
+
   return (
     <div className="transcription-view">
       {error ? (
