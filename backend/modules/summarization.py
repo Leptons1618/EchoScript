@@ -6,6 +6,7 @@ from modules.utils import similar
 import langdetect
 import config
 from transformers import MBartForConditionalGeneration, MBartTokenizer
+from modules.summarization import load_summarizer
 
 # Dictionary of language-specific markers for content analysis
 LANGUAGE_MARKERS = {
