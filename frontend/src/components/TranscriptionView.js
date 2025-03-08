@@ -10,7 +10,7 @@ import {
 } from 'react-icons/fi';
 import { 
   FaFilePdf, FaFileAlt, FaArrowUp, FaArrowDown, 
-  FaSpinner 
+  FaSpinner, FaPaperPlane 
 } from 'react-icons/fa';
 
 const TranscriptionView = () => {
@@ -33,6 +33,20 @@ const TranscriptionView = () => {
   const [transcriptSearch, setTranscriptSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  
+  // Add state for Notion modal
+  const [showNotionModal, setShowNotionModal] = useState(false);
+  const [notionToken, setNotionToken] = useState('');
+  const [notionPageId, setNotionPageId] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+  
+  // Add missing refs
+  const pollIntervalRef = useRef(null);
+  const startTimeRef = useRef(null);
+  
+  // Add new state for tracking export completion
+  const [notionExported, setNotionExported] = useState(false);
   
   // Extract YouTube Video ID from URL
   const extractYoutubeId = useCallback((url) => {
@@ -77,7 +91,7 @@ const TranscriptionView = () => {
   useEffect(() => {
     // Add initial log message
     const timestamp = new Date().toLocaleTimeString();
-    setLogs([`[${timestamp}] Starting transcription process...`]);
+    setStatusHistory([`[${timestamp}] Starting transcription process...`]);
     startTimeRef.current = Date.now();
     
     // Poll job status
@@ -144,7 +158,7 @@ const TranscriptionView = () => {
           
           // Log notes received
           const timestamp = new Date().toLocaleTimeString();
-          setLogs(prev => [
+          setStatusHistory(prev => [
             ...prev, 
             `[${timestamp}] Smart notes generated successfully`
           ]);
@@ -152,7 +166,7 @@ const TranscriptionView = () => {
           // Add a final completion message
           setTimeout(() => {
             const finalTimestamp = new Date().toLocaleTimeString();
-            setLogs(prev => [
+            setStatusHistory(prev => [
               ...prev, 
               `[${finalTimestamp}] All processing complete! Enjoy your transcript.`
             ]);
@@ -173,7 +187,12 @@ const TranscriptionView = () => {
       }
     }, 5000);
     
-    return () => clearInterval(interval);
+    return () => {
+      // Cleanup the interval properly
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
   }, [jobId, jobStatus.status, videoId, extractYoutubeId]);
   
   // Initialize YouTube player once we have a video ID
@@ -874,6 +893,7 @@ const TranscriptionView = () => {
     );
   };
   
+  // Modified renderExportButtons to include Notion export button with disabled state
   const renderExportButtons = () => (
     <div className="export-options">
       <button className="export-button" onClick={exportAsPDF}>
@@ -884,6 +904,161 @@ const TranscriptionView = () => {
         <FaFileAlt className="export-icon" />
         Export as TXT
       </button>
+      <button 
+        className={`export-button notion-button ${notionExported ? 'exported' : ''}`} 
+        onClick={sendToNotion}
+        disabled={notionExported}
+      >
+        <FaPaperPlane className="export-icon" />
+        {notionExported ? 'Exported to Notion' : 'Send to Notion'}
+      </button>
+    </div>
+  );
+
+  // Function to send transcript and notes to Notion
+  const sendToNotion = async () => {
+    // Show the modal to get Notion credentials
+    setShowNotionModal(true);
+  };
+  
+  // Function to handle the actual export to Notion
+  const handleNotionExport = async () => {
+    // If using credentials from modal
+    if (!useStoredCredentials && (!notionToken || !notionPageId)) {
+      setExportError('Please provide both Notion token and page ID');
+      return;
+    }
+    
+    setIsExporting(true);
+    setExportError('');
+    
+    try {
+      // Prepare content for Notion
+      const content = {
+        title: transcript?.title || "YouTube Video Transcript",
+        url: transcript?.youtube_url || "",
+        channel: transcript?.channel || "Unknown",
+        summary: notes?.summary || "",
+        keyPoints: notes?.key_points || [],
+        transcript: transcript?.segments?.map(segment => ({
+          time: formatTime(segment.start),
+          text: segment.text
+        })) || []
+      };
+      
+      // Make API call to backend to send to Notion
+      const response = await fetch('http://localhost:5000/api/export/notion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          notionToken: useStoredCredentials ? null : notionToken,
+          notionPageId: useStoredCredentials ? null : notionPageId,
+          content
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Mark export as complete
+        setNotionExported(true);
+        
+        // If there's a page URL, offer to open it
+        if (data.pageUrl) {
+          const openPage = window.confirm('Successfully exported to Notion! Would you like to open the page?');
+          if (openPage) {
+            window.open(data.pageUrl, '_blank');
+          }
+        }
+        setShowNotionModal(false);
+      } else {
+        setExportError(data.error || 'Failed to export to Notion');
+      }
+    } catch (err) {
+      console.error('Error exporting to Notion:', err);
+      setExportError('Error connecting to server');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Add state for using stored credentials
+  const [useStoredCredentials, setUseStoredCredentials] = useState(true);
+
+  // Render the Notion Export Modal
+  const renderNotionModal = () => (
+    <div className={`notion-modal-overlay ${showNotionModal ? 'show' : ''}`} onClick={() => setShowNotionModal(false)}>
+      <div className="notion-modal" onClick={e => e.stopPropagation()}>
+        <h3>Export to Notion</h3>
+        
+        <div className="notion-form">
+          <div className="credentials-option">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={useStoredCredentials}
+                onChange={(e) => setUseStoredCredentials(e.target.checked)}
+              />
+              Use credentials from environment variables
+            </label>
+          </div>
+          
+          {!useStoredCredentials && (
+            <>
+              <div className="form-group">
+                <label htmlFor="notion-token">Notion Integration Token:</label>
+                <input 
+                  id="notion-token"
+                  type="password" 
+                  value={notionToken} 
+                  onChange={(e) => setNotionToken(e.target.value)}
+                  placeholder="secret_xxx..."
+                />
+                <small>Create an integration at <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer">notion.so/my-integrations</a></small>
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="notion-page">Parent Page ID:</label>
+                <input 
+                  id="notion-page"
+                  type="text" 
+                  value={notionPageId} 
+                  onChange={(e) => setNotionPageId(e.target.value)}
+                  placeholder="Parent page ID where new page will be created"
+                />
+                <small>Found in your parent page URL: notion.so/Page-Name-<b>pageId</b></small>
+              </div>
+            </>
+          )}
+
+          <div className="form-info">
+            <p>
+              <i className="info-icon"></i> 
+              A new Notion page will be created with the video title "{transcript?.title || "YouTube Video Transcript"}"
+            </p>
+          </div>
+          
+          {exportError && <div className="notion-error">{exportError}</div>}
+          
+          <div className="notion-actions">
+            <button 
+              className="notion-cancel" 
+              onClick={() => setShowNotionModal(false)}
+            >
+              Cancel
+            </button>
+            <button 
+              className="notion-submit" 
+              onClick={handleNotionExport}
+              disabled={isExporting || (!useStoredCredentials && (!notionToken || !notionPageId))}
+            >
+              {isExporting ? 'Exporting...' : 'Export'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -987,6 +1162,9 @@ const TranscriptionView = () => {
           )}
         </>
       )}
+      {/* Add modal at the end of the component */}
+      {renderNotionModal()}
+      
       <footer style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.9rem', color: '#6b7280' }}>
         Created by Lept0n5
       </footer>

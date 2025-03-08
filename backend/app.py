@@ -23,6 +23,11 @@ import whisper
 import yt_dlp
 from transformers import pipeline
 
+# Add the Notion API client
+# You'll need to install the Notion SDK first: pip install notion-client
+from notion_client import Client
+import json
+
 # Add LOG_DIR configuration to save log files per session
 LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -844,6 +849,169 @@ def get_job_logs(job_id):
     if job_id in transcription_logs:
         return jsonify({"logs": transcription_logs[job_id]})
     return jsonify({"logs": []})
+
+@app.route('/api/export/notion', methods=['POST'])
+def export_to_notion():
+    """Export transcript and notes to Notion by creating a new page"""
+    try:
+        data = request.json
+        content = data.get('content')
+        
+        # Get API key either from request or environment variable
+        notion_token = data.get('notionToken') or os.getenv('NOTION_API_KEY')
+        
+        # Get parent page ID either from request or environment variable
+        parent_page_id = data.get('notionPageId') or os.getenv('NOTION_PARENT_PAGE_ID')
+        
+        if not notion_token or not parent_page_id or not content:
+            return jsonify({'error': 'Missing required parameters. Please provide Notion token and page ID or set them in environment variables.'}), 400
+        
+        # Initialize Notion client
+        notion = Client(auth=notion_token)
+        
+        try:
+            # Create a new page with the transcript title
+            page_title = content.get('title', 'YouTube Video Transcript')
+            
+            # Create a new page in the parent database/page
+            new_page = notion.pages.create(
+                parent={"page_id": parent_page_id},
+                properties={
+                    "title": {
+                        "title": [
+                            {
+                                "text": {
+                                    "content": page_title
+                                }
+                            }
+                        ]
+                    }
+                }
+            )
+            
+            # Get the ID of the newly created page
+            new_page_id = new_page["id"]
+            
+            # Format content for Notion blocks
+            blocks = []
+            
+            # Add metadata (URL, channel)
+            blocks.append({
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {"type": "text", "text": {"content": "Channel: "}},
+                        {"type": "text", "text": {"content": content['channel']}, "annotations": {"bold": True}}
+                    ]
+                }
+            })
+            
+            if content.get('url'):
+                blocks.append({
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {"type": "text", "text": {"content": "URL: "}},
+                            {"type": "text", "text": {"content": content['url']}, "annotations": {"underline": True}, "href": content['url']}
+                        ]
+                    }
+                })
+            
+            # Add divider
+            blocks.append({"object": "block", "type": "divider", "divider": {}})
+            
+            # Add summary section if available
+            if content.get('summary'):
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {
+                        "rich_text": [{"type": "text", "text": {"content": "Summary"}}]
+                    }
+                })
+                
+                blocks.append({
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [{"type": "text", "text": {"content": content['summary']}}]
+                    }
+                })
+                
+                # Add divider
+                blocks.append({"object": "block", "type": "divider", "divider": {}})
+            
+            # Add key points if available
+            if content.get('keyPoints') and len(content['keyPoints']) > 0:
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {
+                        "rich_text": [{"type": "text", "text": {"content": "Key Points"}}]
+                    }
+                })
+                
+                # Add bullet list for key points
+                for point in content['keyPoints']:
+                    blocks.append({
+                        "object": "block",
+                        "type": "bulleted_list_item",
+                        "bulleted_list_item": {
+                            "rich_text": [{"type": "text", "text": {"content": point}}]
+                        }
+                    })
+                
+                # Add divider
+                blocks.append({"object": "block", "type": "divider", "divider": {}})
+            
+            # Add transcript if available
+            if content.get('transcript') and len(content['transcript']) > 0:
+                blocks.append({
+                    "object": "block",
+                    "type": "heading_2",
+                    "heading_2": {
+                        "rich_text": [{"type": "text", "text": {"content": "Transcript"}}]
+                    }
+                })
+                
+                # Add segments with timestamps
+                for segment in content['transcript']:
+                    blocks.append({
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": [
+                                {"type": "text", "text": {"content": f"[{segment['time']}] "}, "annotations": {"bold": True}},
+                                {"type": "text", "text": {"content": segment['text']}}
+                            ]
+                        }
+                    })
+            
+            # Execute the update to Notion by adding blocks to the new page
+            response = notion.blocks.children.append(
+                block_id=new_page_id,
+                children=blocks
+            )
+            
+            # Get the URL of the newly created page to return to the user
+            page_url = f"https://notion.so/{new_page_id.replace('-', '')}"
+            
+            return jsonify({
+                'success': True, 
+                'message': 'Successfully exported to Notion',
+                'pageId': new_page_id,
+                'pageUrl': page_url
+            })
+        
+        except Exception as e:
+            logger.error(f"Notion API error: {str(e)}")
+            return jsonify({'error': f'Notion API error: {str(e)}'}), 500
+    
+    except Exception as e:
+        logger.error(f"Export to Notion error: {str(e)}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 # Serve React frontend in production
 @app.route('/', defaults={'path': ''})

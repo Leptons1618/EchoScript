@@ -1346,3 +1346,288 @@ body.dark {
   --color-warning-light: #92400e;
   --color-text-dark: #f8fafc;
 }
+
+/* Notion Export Button */
+.notion-button {
+  background-color: white;
+  color: #2e6fdc;
+  border: 1px solid #2e6fdc;
+}
+
+.notion-button:hover {
+  background-color: #f0f4fa;
+}
+
+body.dark .notion-button {
+  background-color: #2d3748;
+  color: #93c5fd;
+  border: 1px solid #93c5fd;
+}
+
+body.dark .notion-button:hover {
+  background-color: rgba(147, 197, 253, 0.1);
+}
+
+/* Notion Modal Styles */
+.notion-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.notion-modal-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.notion-modal {
+  width: 90%;
+  max-width: 500px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 24px;
+}
+
+.notion-modal h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  color: #1f2937;
+}
+
+.notion-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.form-group input {
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-group small {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.form-group a {
+  color: #2e6fdc;
+  text-decoration: none;
+}
+
+.notion-error {
+  color: #ef4444;
+  font-size: 14px;
+  padding: 8px;
+  background-color: #fee2e2;
+  border-radius: 4px;
+}
+
+.notion-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.notion-cancel,
+.notion-submit {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  font-size: 14px;
+}
+
+.notion-cancel {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.notion-submit {
+  background-color: #2e6fdc;
+  color: white;
+}
+
+.notion-submit:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Dark mode styles for modal */
+body.dark .notion-modal {
+  background-color: #1f2937;
+  border: 1px solid #374151;
+}
+
+body.dark .notion-modal h3 {
+  color: #f3f4f6;
+}
+
+body.dark .form-group label {
+  color: #d1d5db;
+}
+
+body.dark .form-group input {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+body.dark .form-group small {
+  color: #9ca3af;
+}
+
+body.dark .notion-error {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+body.dark .notion-cancel {
+  background-color: #374151;
+  color: #d1d5db;
+}
+
+body.dark .notion-submit {
+  background-color: #3b82f6;
+}
+
+/* New/Updated Notion Modal Styles */
+.credentials-option {
+  margin-bottom: 16px;
+  padding: 10px;
+  background-color: #f8fafc;
+  border-radius: 6px;
+  border: 1px dashed #e2e8f0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.form-info {
+  margin: 16px 0;
+  padding: 10px;
+  background-color: rgba(79, 70, 229, 0.1);
+  border-left: 4px solid #4f46e5;
+  border-radius: 4px;
+}
+
+.form-info p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  color: #4b5563;
+}
+
+.info-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  background-color: #4f46e5;
+  border-radius: 50%;
+  position: relative;
+}
+
+.info-icon:before {
+  content: "i";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-style: normal;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* Dark mode adaptations */
+body.dark .credentials-option {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+body.dark .form-info {
+  background-color: rgba(79, 70, 229, 0.1);
+  border-left-color: #6366f1;
+}
+
+body.dark .form-info p {
+  color: #cbd5e0;
+}
+
+/* Updated Notion button styling with more on-brand colors */
+.notion-button {
+  background-color: white;
+  color: #000000;
+  border: 1px solid #000000;
+  transition: all 0.2s ease;
+}
+
+.notion-button:hover {
+  background-color: #f7f6f3;
+  color: #000000;
+}
+
+.notion-button.exported {
+  background-color: #f7f6f3;
+  color: #37352f;
+  border-color: #d3d1cb;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+body.dark .notion-button {
+  background-color: #2d3748;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+}
+
+body.dark .notion-button:hover {
+  background-color: #37352f;
+  color: #ffffff;
+}
+
+body.dark .notion-button.exported {
+  background-color: #37352f;
+  color: #9ca3af;
+  border-color: #4b5563;
+  opacity: 0.7;
+}
