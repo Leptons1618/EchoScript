@@ -1,7 +1,9 @@
 import re
 from nltk.tokenize import sent_tokenize
-from config import logger, summarizer
+from config import logger
+import config  # Import the entire config module
 from modules.utils import similar
+from modules.models import load_summarizer
 
 def extract_important_sentences(transcript):
     """Extract important sentences directly from transcript"""
@@ -33,16 +35,30 @@ def generate_notes(transcript):
     """Generate summary notes from transcript"""
     logger.info("Generating notes from transcript")
     
-    # Check if summarizer is available
-    if summarizer is None:
-        logger.warning("Summarizer not available, returning basic summary")
-        return {
-            "summary": transcript[:1000] + "...",
-            "key_points": ["No key points could be generated. Please try again."],
-            "original_transcript": transcript
-        }
+    # Check if summarizer is available and properly initialized
+    if config.summarizer is None:
+        logger.warning("Summarizer not available, attempting to load default model")
+        
+        # Try to load a summarizer on demand if it's not available
+        if not load_summarizer("t5-small"):  # Try to load a lightweight model
+            logger.warning("Failed to load summarizer on demand, returning basic summary")
+            return {
+                "summary": transcript[:1000] + "...",
+                "key_points": ["No key points could be generated. Summarizer model could not be loaded."],
+                "original_transcript": transcript
+            }
     
     try:
+        # Verify the summarizer is callable before proceeding
+        if not callable(config.summarizer):
+            logger.error("Summarizer is not callable, reloading")
+            if not load_summarizer():
+                return {
+                    "summary": transcript[:1000] + "...",
+                    "key_points": ["No key points could be generated. Summarizer model is not functioning correctly."],
+                    "original_transcript": transcript
+                }
+        
         # Optimize for performance by creating smarter chunks
         sentences = sent_tokenize(transcript)
         chunks = []
@@ -83,34 +99,70 @@ def generate_notes(transcript):
         all_summaries = []
         successful_batches = 0
         
-        for batch_idx, batch in enumerate(batched_chunks):
+        # Use a try-except block for the entire batch processing to avoid partial failures
+        try:
+            # Double check the summarizer again - IMPORTANT: use config.summarizer instead of reimporting
+            if not callable(config.summarizer):
+                raise ValueError("Summarizer is not properly initialized")
+                
+            # Try to detect model type for optimized parameters
+            model_type = "unknown"
             try:
-                # Process each batch with optimized parameters
-                logger.info(f"Processing batch {batch_idx+1}/{len(batched_chunks)}")
-                summaries = summarizer(
-                    batch, 
-                    max_length=150,
-                    min_length=30,
-                    do_sample=True,
-                    temperature=1.0,
-                    num_beams=4,
-                    truncation=True
-                )
-                all_summaries.extend([s['summary_text'] for s in summaries])
-                successful_batches += 1
-                
-                # Log success message
-                logger.info(f"Successfully processed batch {batch_idx+1}")
-                
+                model_type = config.summarizer.model.config.model_type.lower()
+                logger.info(f"Using summarization model type: {model_type}")
             except Exception as e:
-                logger.error(f"Error in batch summarization for batch {batch_idx+1}: {str(e)}")
-                # Skip failed batches
-                continue
+                logger.warning(f"Could not determine model type: {str(e)}")
+            
+            # Prepare parameters based on model type
+            if "t5" in model_type:
+                params = {
+                    "max_length": 150,
+                    "min_length": 30,
+                    "do_sample": False,
+                    "truncation": True
+                }
+            else:  # bart, etc.
+                params = {
+                    "max_length": 150,
+                    "min_length": 30,
+                    "do_sample": True,
+                    "temperature": 1.0,
+                    "num_beams": 4,
+                    "truncation": True
+                }
+                
+            # Process all batches with a single parameter set
+            for batch_idx, batch in enumerate(batched_chunks):
+                try:
+                    logger.info(f"Processing batch {batch_idx+1}/{len(batched_chunks)}")
+                    summaries = config.summarizer(batch, **params)
+                    all_summaries.extend([s['summary_text'] for s in summaries])
+                    successful_batches += 1
+                    logger.info(f"Successfully processed batch {batch_idx+1}")
+                except Exception as batch_error:
+                    logger.error(f"Error in batch summarization for batch {batch_idx+1}: {str(batch_error)}")
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Error during summarization: {str(e)}")
+            # If we have no summaries at this point, try a fallback approach
+            if len(all_summaries) == 0:
+                try:
+                    # Try once more with a direct approach on smaller chunks
+                    logger.info("Attempting fallback summarization with single chunks")
+                    for chunk in valid_chunks[:3]:  # Only try first few chunks
+                        try:
+                            result = config.summarizer(chunk, max_length=100, min_length=20, truncation=True)
+                            all_summaries.append(result[0]['summary_text'])
+                        except:
+                            continue
+                except:
+                    pass
         
         if len(all_summaries) == 0:
             logger.error("No summaries were generated successfully")
             return {
-                "summary": "Failed to generate a summary.",
+                "summary": "Failed to generate a summary. Please try a different model or try again later.",
                 "key_points": ["Failed to extract key points from the transcript."],
                 "original_transcript": transcript
             }
@@ -181,7 +233,7 @@ def generate_notes(transcript):
         logger.error(f"Error in note generation: {str(e)}", exc_info=True)
         # Fallback
         return {
-            "summary": transcript[:1000] + "...",
+            "summary": "Error generating summary: " + str(e)[:100] + "... Please try a different model.",
             "key_points": ["Could not generate key points due to an error."],
             "original_transcript": transcript
         }

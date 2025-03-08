@@ -18,6 +18,7 @@ from modules.utils import ensure_nltk_resources
 from modules.transcription import process_video
 from modules.models import load_whisper_model, verify_faster_whisper_model, load_summarizer, save_app_config, load_app_config
 from modules.notion import export_to_notion
+from modules.summarization import generate_notes
 
 # Ensure required NLTK resources are available
 ensure_nltk_resources()
@@ -25,6 +26,19 @@ ensure_nltk_resources()
 # Initialize Flask app
 app = Flask(__name__, static_folder='../frontend/build')
 CORS(app)
+
+# Remove the automatic model loading at startup
+# def initialize_models():
+#     """Initialize models at startup using saved configuration"""
+#     ...
+# 
+# # Run initialization
+# initialize_models()
+
+# Instead, just load the configuration
+logger.info("Loading application configuration")
+app_config = load_app_config()
+logger.info(f"Configuration loaded: {app_config}")
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_video():
@@ -83,6 +97,34 @@ def load_model_config():
 def get_config():
     config_data = load_app_config()
     return jsonify(config_data), 200
+
+# New endpoint to check summarizer status
+@app.route('/api/summarizer/status', methods=['GET'])
+def check_summarizer_status():
+    from config import summarizer
+    
+    status = {
+        "available": summarizer is not None,
+        "model_name": None,
+        "details": {}
+    }
+    
+    config_data = load_app_config()
+    status["model_name"] = config_data.get("summarizer_model")
+    
+    if summarizer is not None:
+        # Get model details if available
+        try:
+            model_info = summarizer.model.config.to_dict()
+            status["details"] = {
+                "model_type": model_info.get("model_type", "unknown"),
+                "_name_or_path": model_info.get("_name_or_path", "unknown"),
+                "device": str(next(summarizer.model.parameters()).device)
+            }
+        except Exception as e:
+            status["details"] = {"error": f"Could not get model details: {str(e)}"}
+    
+    return jsonify(status)
 
 @app.route('/api/save_theme', methods=['POST'])
 def save_theme():
@@ -225,6 +267,65 @@ def notion_export():
         return jsonify(result)
     else:
         return jsonify(result), 400
+
+@app.route('/api/regenerate_notes/<job_id>', methods=['POST'])
+def regenerate_notes(job_id):
+    """Regenerate notes from existing transcript with optional model selection"""
+    try:
+        from config import TRANSCRIPT_DIR, NOTES_DIR
+        
+        # Get request data for model selection
+        data = request.json or {}
+        model_name = data.get('model')
+        
+        # Check if transcript exists
+        transcript_path = os.path.join(TRANSCRIPT_DIR, f"{job_id}.json")
+        if not os.path.exists(transcript_path):
+            return jsonify({"error": "Transcript not found"}), 404
+            
+        # Read the transcript
+        with open(transcript_path, 'r') as f:
+            transcript_data = json.load(f)
+        
+        # Get the full transcript text
+        full_text = ""
+        if "text" in transcript_data:
+            # Use the full text if available
+            full_text = transcript_data["text"]
+        elif "segments" in transcript_data:
+            # Otherwise concatenate the segments
+            full_text = " ".join([segment.get("text", "") for segment in transcript_data.get("segments", [])])
+        
+        if not full_text:
+            return jsonify({"error": "Empty transcript, cannot generate notes"}), 400
+            
+        # Regenerate the notes with optional model selection
+        logger.info(f"Regenerating notes for job {job_id}" + (f" with model {model_name}" if model_name else ""))
+        
+        # Load the specified model if provided
+        if model_name:
+            success = load_summarizer(model_name)
+            if not success:
+                return jsonify({"error": f"Failed to load summarizer model {model_name}"}), 500
+        
+        # Generate notes with the loaded model
+        notes = generate_notes(full_text)
+        
+        # Save the regenerated notes
+        notes_path = os.path.join(NOTES_DIR, f"{job_id}.json")
+        with open(notes_path, 'w') as f:
+            json.dump(notes, f)
+            
+        # Set the notes path in active_jobs if job is still active
+        if job_id in active_jobs:
+            active_jobs[job_id]["notes_path"] = notes_path
+        
+        logger.info(f"Successfully regenerated notes for job {job_id}")
+        return jsonify(notes)
+        
+    except Exception as e:
+        logger.error(f"Error regenerating notes: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Failed to regenerate notes: {str(e)}"}), 500
 
 # Serve React frontend in production
 @app.route('/', defaults={'path': ''})

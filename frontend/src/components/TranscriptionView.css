@@ -195,14 +195,15 @@
 .notes-section h3 {
   margin-bottom: 15px;
   font-size: 1.25rem;
-  color: #1f2937;
+  color: var(--color-text);
   padding-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.notes-section p, .notes-section li {
+.notes-section p,
+.notes-section li {
   line-height: 1.6;
-  color: #b7bcc4;
+  color: var(--color-text-light);
   margin-bottom: 10px;
 }
 
@@ -1630,4 +1631,225 @@ body.dark .notion-button.exported {
   color: #9ca3af;
   border-color: #4b5563;
   opacity: 0.7;
+}
+
+.notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.regenerate-button {
+  padding: 6px 12px;
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.regenerate-button:hover {
+  background-color: #4338ca;
+}
+
+.regenerate-button:disabled {
+  background-color: #a5b4fc;
+  cursor: not-allowed;
+}
+
+.regeneration-error {
+  color: #ef4444;
+  background-color: #fee2e2;
+  padding: 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+/* Notes header with actions */
+.notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.notes-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.model-select-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.model-select-button:hover {
+  background-color: #e5e7eb;
+  color: #1f2937;
+}
+
+.model-select-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Model selector modal */
+.model-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.model-selector-modal {
+  width: 90%;
+  max-width: 500px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 20px;
+}
+
+.model-selector-modal h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+  color: #111827;
+}
+
+.model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.model-option {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.model-option:hover {
+  border-color: #a5b4fc;
+  background-color: #f5f7ff;
+}
+
+.model-option.selected {
+  border-color: #4f46e5;
+  background-color: rgba(79, 70, 229, 0.05);
+}
+
+.model-option-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.model-name {
+  font-weight: 500;
+  color: #111827;
+}
+
+.model-size {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.model-description {
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.model-selector-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.cancel-button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* Dark mode styles */
+body.dark .model-select-button {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #9ca3af;
+}
+
+body.dark .model-select-button:hover {
+  background-color: #4b5563;
+  color: #e5e7eb;
+}
+
+body.dark .model-selector-modal {
+  background-color: #1f2937;
+  border: 1px solid #374151;
+}
+
+body.dark .model-selector-modal h3 {
+  color: #f9fafb;
+}
+
+body.dark .model-option {
+  border-color: #4b5563;
+  background-color: #374151;
+}
+
+body.dark .model-option:hover {
+  border-color: #818cf8;
+  background-color: #2d3748;
+}
+
+body.dark .model-option.selected {
+  border-color: #6366f1;
+  background-color: rgba(99, 102, 241, 0.15);
+}
+
+body.dark .model-name {
+  color: #f3f4f6;
+}
+
+body.dark .model-size {
+  color: #9ca3af;
+}
+
+body.dark .model-description {
+  color: #d1d5db;
+}
+
+body.dark .cancel-button {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
 }

@@ -2,6 +2,42 @@ import os
 from notion_client import Client
 from config import logger
 
+def sanitize_text(text):
+    """Sanitize text to handle Unicode characters safely
+    
+    Args:
+        text: Text that might contain Unicode characters
+        
+    Returns:
+        str: Sanitized text
+    """
+    if not text:
+        return text
+        
+    try:
+        # Try to encode and then decode to catch any encoding issues
+        return text.encode('utf-8', errors='ignore').decode('utf-8')
+    except Exception as e:
+        logger.warning(f"Error sanitizing text: {str(e)}")
+        # Fall back to ASCII if all else fails
+        return text.encode('ascii', errors='ignore').decode('ascii')
+
+def sanitize_error_message(error_message):
+    """Sanitize error messages for safe logging
+    
+    Args:
+        error_message: Error message that might contain Unicode characters
+        
+    Returns:
+        str: Sanitized error message
+    """
+    try:
+        # Convert the error message to a simple ASCII string
+        return str(error_message).encode('ascii', errors='replace').decode('ascii')
+    except Exception:
+        # Ultimate fallback
+        return "Error message contained unprocessable characters"
+
 def export_to_notion(content, notion_token=None, parent_page_id=None):
     """Export transcript and notes to Notion by creating a new page
     
@@ -31,7 +67,7 @@ def export_to_notion(content, notion_token=None, parent_page_id=None):
         
         try:
             # Create a new page with the transcript title
-            page_title = content.get('title', 'YouTube Video Transcript')
+            page_title = sanitize_text(content.get('title', 'YouTube Video Transcript'))
             
             # Create a new page in the parent database/page
             new_page = notion.pages.create(
@@ -62,7 +98,7 @@ def export_to_notion(content, notion_token=None, parent_page_id=None):
                 "paragraph": {
                     "rich_text": [
                         {"type": "text", "text": {"content": "Channel: "}},
-                        {"type": "text", "text": {"content": content['channel']}, "annotations": {"bold": True}}
+                        {"type": "text", "text": {"content": sanitize_text(content['channel'])}, "annotations": {"bold": True}}
                     ]
                 }
             })
@@ -74,7 +110,7 @@ def export_to_notion(content, notion_token=None, parent_page_id=None):
                     "paragraph": {
                         "rich_text": [
                             {"type": "text", "text": {"content": "URL: "}},
-                            {"type": "text", "text": {"content": content['url']}, "annotations": {"underline": True}, "href": content['url']}
+                            {"type": "text", "text": {"content": sanitize_text(content['url'])}, "annotations": {"underline": True}, "href": sanitize_text(content['url'])}
                         ]
                     }
                 })
@@ -96,7 +132,7 @@ def export_to_notion(content, notion_token=None, parent_page_id=None):
                     "object": "block",
                     "type": "paragraph",
                     "paragraph": {
-                        "rich_text": [{"type": "text", "text": {"content": content['summary']}}]
+                        "rich_text": [{"type": "text", "text": {"content": sanitize_text(content['summary'])}}]
                     }
                 })
                 
@@ -119,7 +155,7 @@ def export_to_notion(content, notion_token=None, parent_page_id=None):
                         "object": "block",
                         "type": "bulleted_list_item",
                         "bulleted_list_item": {
-                            "rich_text": [{"type": "text", "text": {"content": point}}]
+                            "rich_text": [{"type": "text", "text": {"content": sanitize_text(point)}}]
                         }
                     })
                 
@@ -144,16 +180,21 @@ def export_to_notion(content, notion_token=None, parent_page_id=None):
                         "paragraph": {
                             "rich_text": [
                                 {"type": "text", "text": {"content": f"[{segment['time']}] "}, "annotations": {"bold": True}},
-                                {"type": "text", "text": {"content": segment['text']}}
+                                {"type": "text", "text": {"content": sanitize_text(segment['text'])}}
                             ]
                         }
                     })
             
-            # Execute the update to Notion by adding blocks to the new page
-            notion.blocks.children.append(
-                block_id=new_page_id,
-                children=blocks
-            )
+            # Split blocks into chunks of 100 (Notion API limit)
+            NOTION_BLOCK_LIMIT = 100
+            block_chunks = [blocks[i:i + NOTION_BLOCK_LIMIT] for i in range(0, len(blocks), NOTION_BLOCK_LIMIT)]
+            
+            # Append blocks in batches
+            for chunk in block_chunks:
+                notion.blocks.children.append(
+                    block_id=new_page_id,
+                    children=chunk
+                )
             
             # Get the URL of the newly created page to return to the user
             page_url = f"https://notion.so/{new_page_id.replace('-', '')}"
@@ -166,9 +207,13 @@ def export_to_notion(content, notion_token=None, parent_page_id=None):
             }
         
         except Exception as e:
-            logger.error(f"Notion API error: {str(e)}")
-            return {'success': False, 'error': f'Notion API error: {str(e)}'}
+            # Sanitize the error message to prevent Unicode encoding issues in logs
+            safe_error_msg = sanitize_error_message(str(e))
+            logger.error(f"Notion API error: {safe_error_msg}")
+            return {'success': False, 'error': f'Notion API error: {safe_error_msg}'}
     
     except Exception as e:
-        logger.error(f"Export to Notion error: {str(e)}")
-        return {'success': False, 'error': f'Server error: {str(e)}'}
+        # Sanitize the error message to prevent Unicode encoding issues in logs
+        safe_error_msg = sanitize_error_message(str(e))
+        logger.error(f"Export to Notion error: {safe_error_msg}")
+        return {'success': False, 'error': f'Server error: {safe_error_msg}'}

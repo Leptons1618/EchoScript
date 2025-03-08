@@ -6,7 +6,7 @@ import './TranscriptionView.css';
 // Import icons from React Icons - removed unused imports
 import { 
   FiSearch, FiX,
-  FiCheck, FiAlertTriangle 
+  FiCheck, FiAlertTriangle, FiSettings 
 } from 'react-icons/fi';
 import { 
   FaFilePdf, FaFileAlt, FaArrowUp, FaArrowDown, 
@@ -47,6 +47,15 @@ const TranscriptionView = () => {
   
   // Add new state for tracking export completion
   const [notionExported, setNotionExported] = useState(false);
+  
+  // Add state for regenerating summary
+  const [isRegeneratingNotes, setIsRegeneratingNotes] = useState(false);
+  const [regenerationError, setRegenerationError] = useState('');
+  
+  // Add state for summarizer model selection
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [availableSummarizers, setAvailableSummarizers] = useState({});
+  const [selectedSummarizerModel, setSelectedSummarizerModel] = useState('');
   
   // Extract YouTube Video ID from URL
   const extractYoutubeId = useCallback((url) => {
@@ -798,7 +807,30 @@ const TranscriptionView = () => {
     return (
       <div className="notes-container">
         <div className="notes-section">
-          <h3>Summary</h3>
+          <div className="notes-header">
+            <h3>Summary</h3>
+            <div className="notes-actions">
+              <button 
+                className="model-select-button"
+                onClick={() => setShowModelSelector(true)}
+                title="Select summarizer model"
+                disabled={isRegeneratingNotes}
+              >
+                <FiSettings />
+              </button>
+              <button 
+                className="regenerate-button"
+                onClick={regenerateNotes}
+                disabled={isRegeneratingNotes}
+                title="Generate new summary from transcript"
+              >
+                {isRegeneratingNotes ? 'Regenerating...' : 'Generate Again'}
+              </button>
+            </div>
+          </div>
+          {regenerationError && (
+            <div className="regeneration-error">{regenerationError}</div>
+          )}
           <p>{notes.summary}</p>
         </div>
         
@@ -1108,6 +1140,105 @@ const TranscriptionView = () => {
     }
   };
 
+  // Add function to regenerate notes
+  const regenerateNotes = async () => {
+    if (!transcript || !jobId) return;
+    
+    setIsRegeneratingNotes(true);
+    setRegenerationError('');
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/regenerate_notes/${jobId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: selectedSummarizerModel
+        })
+      });
+      
+      if (response.ok) {
+        const updatedNotes = await response.json();
+        setNotes(updatedNotes);
+        
+        // Add success message to status history
+        const timestamp = new Date().toLocaleTimeString();
+        setStatusHistory(prev => [
+          ...prev, 
+          `[${timestamp}] Summary regenerated successfully with ${selectedSummarizerModel}!`
+        ]);
+        
+        // Hide the model selector if it's open
+        setShowModelSelector(false);
+      } else {
+        const errorData = await response.json();
+        setRegenerationError(errorData.error || 'Failed to regenerate summary');
+      }
+    } catch (err) {
+      console.error('Error regenerating notes:', err);
+      setRegenerationError('Error connecting to server');
+    } finally {
+      setIsRegeneratingNotes(false);
+    }
+  };
+
+  // Fetch available summarizer models
+  useEffect(() => {
+    fetch('http://localhost:5000/api/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.available_summarizers) {
+          setAvailableSummarizers(data.available_summarizers);
+          setSelectedSummarizerModel(data.summarizer_model || Object.keys(data.available_summarizers)[0]);
+        }
+      })
+      .catch(err => console.error("Error loading summarizers:", err));
+  }, []);
+
+  // Add model selector modal
+  const renderModelSelectorModal = () => {
+    if (!showModelSelector) return null;
+    
+    return (
+      <div className="model-selector-overlay" onClick={() => setShowModelSelector(false)}>
+        <div className="model-selector-modal" onClick={e => e.stopPropagation()}>
+          <h3>Select Summarizer Model</h3>
+          <div className="model-list">
+            {Object.keys(availableSummarizers).map(key => (
+              <div 
+                key={key} 
+                className={`model-option ${selectedSummarizerModel === key ? 'selected' : ''}`}
+                onClick={() => setSelectedSummarizerModel(key)}
+              >
+                <div className="model-option-header">
+                  <div className="model-name">{key}</div>
+                  <div className="model-size">{availableSummarizers[key].size}</div>
+                </div>
+                <div className="model-description">{availableSummarizers[key].description}</div>
+              </div>
+            ))}
+          </div>
+          <div className="model-selector-actions">
+            <button 
+              className="cancel-button" 
+              onClick={() => setShowModelSelector(false)}
+            >
+              Cancel
+            </button>
+            <button 
+              className="regenerate-button"
+              onClick={regenerateNotes}
+              disabled={isRegeneratingNotes}
+            >
+              {isRegeneratingNotes ? 'Regenerating...' : 'Generate with Selected Model'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="transcription-view">
       {error ? (
@@ -1164,6 +1295,7 @@ const TranscriptionView = () => {
       )}
       {/* Add modal at the end of the component */}
       {renderNotionModal()}
+      {renderModelSelectorModal()}
       
       <footer style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.9rem', color: '#6b7280' }}>
         Created by Lept0n5
