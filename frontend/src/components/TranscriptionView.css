@@ -860,7 +860,7 @@ body.dark .status-history-entry {
   border-radius: 4px;
 }
 
-.transcription-logs::-webkit-scrollbar-thumb {
+transcription-logs::-webkit-scrollbar-thumb {
   background: #c7d2fe;
   border-radius: 4px;
 }
@@ -1630,4 +1630,33 @@ body.dark .notion-button.exported {
   color: #9ca3af;
   border-color: #4b5563;
   opacity: 0.7;
+}
+
+/* Add this to your existing CSS file */
+
+.language-badge {
+  display: inline-block;
+  background-color: var(--secondary-bg);
+  border-radius: 16px;
+  padding: 4px 12px;
+  margin-top: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.language-label {
+  font-weight: 500;
+  margin-right: 5px;
+  color: var(--text-muted);
+}
+
+.language-name {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+/* Enhance transcript header styling */
+.transcript-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
 }

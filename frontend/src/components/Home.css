@@ -93,18 +93,30 @@
   color: var(--color-text);
 }
 
+/* Update the features grid to fit more cards */
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
 }
 
 .feature-card {
   background-color: var(--color-card-bg);
-  padding: 30px;
+  padding: 20px;
   border-radius: 12px;
   box-shadow: 0 4px 6px var(--color-shadow);
   transition: transform 0.3s, box-shadow 0.3s;
+}
+
+/* Special styling for multilingual card */
+.multilingual-card {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border-left: 4px solid #4f46e5;
+}
+
+body.dark .multilingual-card {
+  background: linear-gradient(135deg, #0c4a6e, #075985);
+  border-left: 4px solid #93c5fd;
 }
 
 .feature-card:hover {
@@ -337,4 +349,123 @@
 .config-button:hover .config-icon {
   transform: rotate(90deg);
   opacity: 1;
+}
+
+/* Add this to your existing CSS file */
+
+.multilingual-banner {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(45deg, #4f46e5, #8b5cf6);
+  color: white;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin: 24px 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.banner-icon {
+  font-size: 32px;
+  margin-right: 16px;
+}
+
+.banner-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.banner-content p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* Add this to your existing CSS */
+
+.specialized-option {
+  background-color: #e0f2fe; /* Light blue background */
+  font-weight: bold;
+}
+
+body.dark .specialized-option {
+  background-color: #0c4a6e; /* Dark blue background for dark mode */
+  color: #e0f2fe;
+}
+
+/* Style for the star marker */
+option[value*="IndicBART"]:after,
+option[value*="mt5-base"]:after {
+  content: " ★";
+  color: #f59e0b; /* Amber color star */
+}
+
+/* Updated config modal styling for better alignment */
+.config-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.config-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.config-option label {
+  flex: 0 0 100px;
+  text-align: right;
+  padding-right: 15px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.config-option select {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background-color: var(--color-input-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+/* Highlight specialized languages */
+.specialized-language {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+/* Model info styling */
+.model-info {
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 15px;
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+  text-align: center;
+}
+
+.language-match {
+  margin-top: 5px;
+  font-weight: 500;
+  color: #10b981;
+}
+
+/* Action buttons container */
+.config-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.model-info-table {
+  margin-bottom: 20px;
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  text-align: left;
 }

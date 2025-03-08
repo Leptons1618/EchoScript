@@ -768,6 +768,9 @@ const TranscriptionView = () => {
     
     return (
       <>
+        {/* Add transcript header with language info */}
+        {renderTranscriptHeader()}
+        
         <div className="transcript-search">
           {renderSearchControls()}
         </div>
@@ -1106,6 +1109,35 @@ const TranscriptionView = () => {
       default:
         return <FaSpinner className="status-icon spinning" />;
     }
+  };
+
+  // Add language display in transcript view with enhanced styling
+  const renderTranscriptHeader = () => {
+    if (!transcript) return null;
+    
+    return (
+      <div className="transcript-header">
+        <h3>{transcript.title || "Transcript"}</h3>
+        {transcript.channel && <p className="transcript-channel">Channel: {transcript.channel}</p>}
+        {transcript.language && (
+          <div className="language-badge">
+            <span className="language-label">Language:</span>
+            <span className="language-name">{getLanguageName(transcript.language)}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Helper function to display language names
+  const getLanguageName = (code) => {
+    const languages = {
+      'en': 'English',
+      'hi': 'Hindi',
+      'bn': 'Bengali',
+      // Add more languages as needed
+    };
+    return languages[code] || code;
   };
 
   return (

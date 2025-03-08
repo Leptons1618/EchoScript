@@ -30,10 +30,10 @@ def download_youtube_audio(youtube_url, job_id):
     logger.info(f"Job {job_id}: Audio downloaded successfully")
     return os.path.join(AUDIO_DIR, f"{job_id}.mp3")
 
-def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
-    """Transcribe audio using the specified model"""
+def transcribe_audio(audio_path, model_type="whisper", model_size="medium", language=None):
+    """Transcribe audio using the specified model and language"""
     global transcription_model, current_whisper_model_size
-    logger.info(f"Transcribing audio with {model_type} model ({model_size}) from {audio_path}")
+    logger.info(f"Transcribing audio with {model_type} model ({model_size}) from {audio_path}, language: {language or 'auto'}")
     
     if not os.path.exists(audio_path):
         logger.error(f"Audio file not found: {audio_path}")
@@ -69,10 +69,12 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
             segment_count = 0
             last_log_time = time.time()
             
-            # Process segments with optimization options
+            # Process segments with optimization options and language
             for segment in faster_model.transcribe(
                 audio_path,
                 beam_size=5,
+                language=language,  # Add language parameter 
+                task="transcribe",
                 vad_filter=True,
                 vad_parameters=dict(min_silence_duration_ms=500),
             )[0]:
@@ -119,7 +121,8 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
                 audio_path,
                 fp16=True,
                 beam_size=5,
-                best_of=5
+                best_of=5,
+                language=language  # Add language parameter
             )
             
             # Log some segments for UI display without flooding logs
@@ -139,13 +142,15 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium"):
             logger.error(f"Error in Whisper transcription: {str(e)}")
             raise
 
-def process_video(youtube_url, job_id):
+def process_video(youtube_url, job_id, language=None):
     """Main processing function for a video - downloads, transcribes and generates notes"""
     try:
         with threading.Lock():
             if job_id not in active_jobs:
                 active_jobs[job_id] = {"url": youtube_url, "created_at": time.time()}
             active_jobs[job_id]["status"] = "downloading"
+            if language:
+                active_jobs[job_id]["language"] = language
         logger.info(f"Job {job_id}: Downloading audio...")
         
         audio_path = download_youtube_audio(youtube_url, job_id)
@@ -158,9 +163,10 @@ def process_video(youtube_url, job_id):
         # Retrieve configuration for model
         model_type = active_jobs[job_id].get("model_type", "whisper")
         model_size = active_jobs[job_id].get("model_size", "medium")
+        language = active_jobs[job_id].get("language", None)
         
         # Transcribe audio based on selected model
-        transcript, segments = transcribe_audio(audio_path, model_type, model_size)
+        transcript, segments = transcribe_audio(audio_path, model_type, model_size, language)
         
         # Get video metadata BEFORE saving transcript
         ydl_opts = {
@@ -170,13 +176,14 @@ def process_video(youtube_url, job_id):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(youtube_url, download=False)
         
-        # Save transcript including title and channel
+        # Save transcript including title, channel and language
         transcript_data = {
             "text": transcript,
             "segments": segments,
             "title": info.get('title', 'Unknown'),
             "channel": info.get('uploader', 'Unknown'),
-            "youtube_url": youtube_url
+            "youtube_url": youtube_url,
+            "language": language
         }
         transcript_path = os.path.join(TRANSCRIPT_DIR, f"{job_id}.json")
         with open(transcript_path, 'w') as f:
@@ -187,8 +194,8 @@ def process_video(youtube_url, job_id):
             active_jobs[job_id]["status"] = "generating_notes"
             active_jobs[job_id]["transcript_path"] = transcript_path
         
-        # Generate and save notes
-        notes = generate_notes(transcript)
+        # Generate and save notes with language support
+        notes = generate_notes(transcript, language)
         notes["title"] = transcript_data["title"]
         notes_path = os.path.join(NOTES_DIR, f"{job_id}.json")
         with open(notes_path, 'w') as f:
