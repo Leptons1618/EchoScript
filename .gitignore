@@ -63,4 +63,7 @@ yarn-error.log*
 .vscode/
 Archived/
 Sandbox/
+
+# Python Environment
 __pycache__/
+*.pyc

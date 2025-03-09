@@ -42,33 +42,44 @@ logger.info(f"Configuration loaded: {app_config}")
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_video():
-    data = request.json
-    youtube_url = data.get('youtube_url')
-    if not youtube_url:
-        logger.warning("No YouTube URL provided")
-        return jsonify({"error": "No YouTube URL provided"}), 400
-
-    # Read additional config options
-    model_type = data.get('model_type', 'whisper')
-    model_size = data.get('model_size', 'medium')
-    
-    job_id = str(uuid.uuid4())
-    logger.info(f"Job {job_id} created for URL: {youtube_url} using {model_type} ({model_size})")
-    
-    # Store config in job details
-    active_jobs[job_id] = {
-        "status": "downloading",
-        "url": youtube_url,
-        "created_at": time.time(),
-        "model_type": model_type,
-        "model_size": model_size
-    }
-    
-    # Start processing in a new thread
-    thread = threading.Thread(target=process_video, args=(youtube_url, job_id))
-    thread.start()
-    
-    return jsonify({"job_id": job_id, "status": "processing"})
+    """API endpoint to start transcription of a YouTube video"""
+    try:
+        data = request.json
+        youtube_url = data.get('youtube_url')  # Note that this might be 'url' in your code
+        model_type = data.get('model_type', 'whisper')
+        model_size = data.get('model_size', 'medium')
+        language = data.get('language')  # Add language parameter
+        
+        # Improved validation for YouTube URLs
+        import re
+        youtube_pattern = re.compile(r'^(https?://)?(www\.)?(youtube\.com/(watch\?v=|v/|embed/|shorts/)|youtu\.be/)')
+        if not youtube_url or not youtube_pattern.match(youtube_url):
+            return jsonify({"error": "Invalid YouTube URL"}), 400
+            
+        # Generate unique job ID
+        job_id = str(uuid.uuid4())
+        
+        # Save job config including language
+        active_jobs[job_id] = {
+            "url": youtube_url,
+            "status": "queued",
+            "created_at": time.time(),
+            "model_type": model_type,
+            "model_size": model_size,
+            "language": language  # Store language in job config
+        }
+        
+        # Start processing in a separate thread
+        thread = threading.Thread(target=process_video, args=(youtube_url, job_id, language))
+        thread.daemon = True
+        thread.start()
+        
+        logger.info(f"Started job {job_id} for URL: {youtube_url} with model: {model_type}/{model_size}, language: {language or 'auto'}")
+        return jsonify({"job_id": job_id, "status": "queued"})
+        
+    except Exception as e:
+        logger.error(f"Error starting transcription: {str(e)}")
+        return jsonify({"error": "Failed to start transcription job"}), 500
 
 @app.route('/api/load_model', methods=['POST'])
 def load_model_config():
@@ -96,6 +107,22 @@ def load_model_config():
 @app.route('/api/config', methods=['GET'])
 def get_config():
     config_data = load_app_config()
+    
+    # Add available summarizers to the response
+    from modules.models import get_available_summarizers
+    config_data["available_summarizers"] = get_available_summarizers()
+    
+    # Add language support information
+    config_data["language_support"] = {
+        # Standard models support all languages but at varying quality
+        "standard_summarizers": ["bart-large-cnn", "facebook/bart-large-xsum", "google/pegasus-xsum"],
+        # Specialized models for specific languages
+        "specialized_summarizers": {
+            "hi": ["ai4bharat/IndicBART"],
+            "bn": ["google/mt5-base"]
+        }
+    }
+    
     return jsonify(config_data), 200
 
 # New endpoint to check summarizer status

@@ -21,6 +21,7 @@ const Home = () => {
   const [summarizerModel, setSummarizerModel] = useState('bart-large-cnn');
   const [availableSummarizers, setAvailableSummarizers] = useState({});
   const [summarizerStatus, setSummarizerStatus] = useState("no summarizer loaded");
+  const [language, setLanguage] = useState(''); // '' means auto-detect
 
   // Enhanced useEffect to fetch model status and configuration on startup
   useEffect(() => {
@@ -78,7 +79,8 @@ const Home = () => {
         body: JSON.stringify({ 
           youtube_url: youtubeUrl,
           model_type: modelType,
-          model_size: modelSize
+          model_size: modelSize,
+          language: language // Add language to the request
         }),
       });
       
@@ -96,6 +98,29 @@ const Home = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Add useEffect for language-based model recommendation
+  useEffect(() => {
+    // When language changes, recommend appropriate summarizer model
+    if (['hi', 'bn'].includes(language)) {
+      // Get the specialized model for this language
+      const recommendedModel = language === 'hi' ? 'ai4bharat/IndicBART' : 'google/mt5-base';
+      
+      // Check if the model is available in our options
+      if (availableSummarizers[recommendedModel]) {
+        // Show a recommendation notification
+        const confirmed = window.confirm(
+          `You've selected ${language === 'hi' ? 'Hindi' : 'Bengali'}. Would you like to use the specialized ${
+            recommendedModel.split('/')[1]
+          } summarization model for better results?`
+        );
+        
+        if (confirmed) {
+          setSummarizerModel(recommendedModel);
+        }
+      }
+    }
+  }, [language, availableSummarizers]);
 
   // Updated saveConfig function: close popup immediately, show loading animation,
   // then update status to loaded on success.
@@ -167,9 +192,12 @@ const Home = () => {
     }
   };
 
-  // New helper to validate YouTube URLs
+  // New helper to validate YouTube URLs with improved pattern
   const isValidYoutubeUrl = (url) => {
-    const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//;
+    if (!url || url.trim() === '') return false;
+    
+    // More comprehensive regex to handle various YouTube URL formats
+    const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|v\/|embed\/|shorts\/)|youtu\.be\/)/;
     return pattern.test(url.trim());
   };
 
@@ -219,30 +247,38 @@ const Home = () => {
 
       <div className="features-section">
         <h2 style={{ fontSize: '1.5rem' }}>Advanced Features</h2>
-        <div className="features-grid">
+        <div className="features-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
           <div className="feature-card">
             {/* Replace emoji with icon */}
             <div className="feature-icon"><FaFileAlt /></div>
-            <h3 style={{ fontSize: '1.2rem' }}>Accurate Transcription</h3>
+            <h3 style={{ fontSize: '1.1rem' }}>Accurate Transcription</h3>
             <p>Powered by OpenAI's Whisper, our system delivers high-quality transcriptions</p>
           </div>
           <div className="feature-card">
             {/* Replace emoji with icon */}
             <div className="feature-icon"><FaChartBar /></div>
-            <h3 style={{ fontSize: '1.2rem' }}>Smart Notes</h3>
+            <h3 style={{ fontSize: '1.1rem' }}>Smart Notes</h3>
             <p>AI-generated notes that capture key points and summarize content</p>
           </div>
           <div className="feature-card">
             {/* Replace emoji with icon */}
             <div className="feature-icon"><FaClock /></div>
-            <h3 style={{ fontSize: '1.2rem' }}>Time-Stamped</h3>
+            <h3 style={{ fontSize: '1.1rem' }}>Time-Stamped</h3>
             <p>Navigate through transcripts with precise time markers</p>
           </div>
           <div className="feature-card">
             {/* Replace emoji with icon */}
             <div className="feature-icon"><FaSave /></div>
-            <h3 style={{ fontSize: '1.2rem' }}>Save & Export</h3>
+            <h3 style={{ fontSize: '1.1rem' }}>Save & Export</h3>
             <p>Download transcripts and notes in multiple formats</p>
+          </div>
+          {/* New Multilingual Support Card */}
+          <div className="feature-card multilingual-card">
+            <div className="feature-icon">
+              <span role="img" aria-label="Globe">🌐</span>
+            </div>
+            <h3 style={{ fontSize: '1.1rem' }}>Multilingual Support</h3>
+            <p>Enhanced support for Hindi and Bengali with specialized AI models</p>
           </div>
         </div>
       </div>
@@ -305,79 +341,125 @@ const Home = () => {
             background: 'white',
             padding: '30px',
             borderRadius: '12px',
-            width: '480px',  // Same width for both model types
-            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+            width: '550px',  // Increased from 520px for more horizontal space
+            maxHeight: '90vh',  // Increased from 85vh to 90vh for more vertical space
+            overflow: 'auto',  // Added scrolling if needed
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)', // Enhanced shadow
             textAlign: 'center'
           }}>
             <h2 style={{ fontSize: '1.3rem', marginBottom: '20px' }}>Model Configuration</h2>
-            <div style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <label style={{ marginRight: '10px', fontSize: '0.9rem', minWidth: '40px' }}>Type:</label>
-              <select 
-                value={modelType} 
-                onChange={(e) => {
-                  setModelType(e.target.value);
-                  // Don't reset size if same model type or if there's a compatible size
-                  if (e.target.value !== modelType) {
-                    setModelSize("tiny"); // Reset size only on model type change
-                  }
-                }}
-              >
-                <option value="whisper">Whisper</option>
-                <option value="faster-whisper">Faster-Whisper</option>
-              </select>
+            
+            {/* Add a consistent container for all config options */}
+            <div className="config-options">
+              {/* Model type selection */}
+              <div className="config-option">
+                <label>Model Type:</label>
+                <select 
+                  value={modelType} 
+                  onChange={(e) => {
+                    setModelType(e.target.value);
+                    // Don't reset size if same model type or if there's a compatible size
+                    if (e.target.value !== modelType) {
+                      setModelSize("tiny"); // Reset size only on model type change
+                    }
+                  }}
+                >
+                  <option value="whisper">Whisper</option>
+                  <option value="faster-whisper">Faster-Whisper</option>
+                </select>
+              </div>
+
+              {/* Model size selection */}
+              <div className="config-option">
+                <label>Model Size:</label>
+                <select 
+                  value={modelSize} 
+                  onChange={(e) => setModelSize(e.target.value)}
+                >
+                  {modelType === 'faster-whisper' ? (
+                    <>
+                      <option value="tiny">tiny</option>
+                      <option value="base">base</option>
+                      <option value="small">small</option>
+                      <option value="medium">medium</option>
+                      <option value="large">large</option>
+                      <option value="turbo">turbo</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="tiny">tiny</option>
+                      <option value="base">base</option>
+                      <option value="small">small</option>
+                      <option value="medium">medium</option>
+                      <option value="turbo">turbo</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Language selection - MOVED FROM OUTSIDE THE MODAL */}
+              <div className="config-option">
+                <label>Language:</label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className={['hi', 'bn'].includes(language) ? 'specialized-language' : ''}
+                >
+                  <option value="">Auto Detect</option>
+                  <option value="en">English</option>
+                  <option value="hi" className="specialized-option">Hindi ★</option>
+                  <option value="bn" className="specialized-option">Bengali ★</option>
+                  <option value="es">Spanish</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="ja">Japanese</option>
+                  <option value="zh">Chinese</option>
+                  <option value="ru">Russian</option>
+                </select>
+              </div>
+
+              {/* Summarizer model selection */}
+              <div className="config-option">
+                <label>Summarizer:</label>
+                <select 
+                  value={summarizerModel} 
+                  onChange={(e) => setSummarizerModel(e.target.value)}
+                >
+                  {Object.keys(availableSummarizers).map(key => (
+                    <option key={key} value={key} className={
+                      // Highlight specialized models for current language
+                      (language === 'hi' && availableSummarizers[key].languages?.includes('hi')) ||
+                      (language === 'bn' && availableSummarizers[key].languages?.includes('bn'))
+                        ? 'specialized-option'
+                        : ''
+                    }>
+                      {key.includes('/') ? key.split('/')[1] : key} 
+                      {availableSummarizers[key].languages?.includes(language) && ' ★'}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <label style={{ marginRight: '10px', fontSize: '0.9rem', minWidth: '40px' }}>Size:</label>
-              <select 
-                value={modelSize} 
-                onChange={(e) => setModelSize(e.target.value)}
-              >
-                {modelType === 'faster-whisper' ? (
-                  <>
-                    <option value="tiny">tiny</option>
-                    <option value="base">base</option>
-                    <option value="small">small</option>
-                    <option value="medium">medium</option>
-                    <option value="large">large</option>
-                    <option value="turbo">turbo</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="tiny">tiny</option>
-                    <option value="base">base</option>
-                    <option value="small">small</option>
-                    <option value="medium">medium</option>
-                    <option value="turbo">turbo</option>
-                  </>
-                )}
-              </select>
-            </div>
-            {/* NEW: Summarizer model selection */}
-            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <label style={{ marginRight: '10px', fontSize: '0.9rem', minWidth: '70px' }}>Summarizer:</label>
-              <select 
-                value={summarizerModel} 
-                onChange={(e) => setSummarizerModel(e.target.value)}
-                style={{ minWidth: '180px' }}
-              >
-                {Object.keys(availableSummarizers).map(key => (
-                  <option key={key} value={key}>{key} ({availableSummarizers[key].size})</option>
-                ))}
-              </select>
-            </div>
+
             {/* Summarizer model info */}
             {availableSummarizers[summarizerModel] && (
-              <div style={{ marginBottom: '15px', fontSize: '0.85rem', color: '#666', textAlign: 'center' }}>
+              <div className="model-info">
                 {availableSummarizers[summarizerModel].description}
+                {availableSummarizers[summarizerModel].languages?.includes(language) && (
+                  <div className="language-match">
+                    <span role="img" aria-label="Star">⭐</span> Optimized for {language === 'hi' ? 'Hindi' : 'Bengali'}
+                  </div>
+                )}
               </div>
             )}
-            <div style={{ marginBottom: '20px', maxHeight: '150px', overflowY: 'auto', fontSize: '0.8rem', textAlign: 'left' }}>
+
+            {/* Keep the model info table */}
+            <div className="model-info-table">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Size</th>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Params</th>
-                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Eng-only</th>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Multi</th>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>VRAM</th>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Speed</th>
@@ -387,7 +469,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>tiny</td>
                     <td style={{ padding: '4px' }}>39M</td>
-                    <td style={{ padding: '4px' }}>tiny.en</td>
                     <td style={{ padding: '4px' }}>tiny</td>
                     <td style={{ padding: '4px' }}>~1GB</td>
                     <td style={{ padding: '4px' }}>~10x</td>
@@ -395,7 +476,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>base</td>
                     <td style={{ padding: '4px' }}>74M</td>
-                    <td style={{ padding: '4px' }}>base.en</td>
                     <td style={{ padding: '4px' }}>base</td>
                     <td style={{ padding: '4px' }}>~1GB</td>
                     <td style={{ padding: '4px' }}>~7x</td>
@@ -403,7 +483,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>small</td>
                     <td style={{ padding: '4px' }}>244M</td>
-                    <td style={{ padding: '4px' }}>small.en</td>
                     <td style={{ padding: '4px' }}>small</td>
                     <td style={{ padding: '4px' }}>~2GB</td>
                     <td style={{ padding: '4px' }}>~4x</td>
@@ -411,7 +490,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>medium</td>
                     <td style={{ padding: '4px' }}>769M</td>
-                    <td style={{ padding: '4px' }}>medium.en</td>
                     <td style={{ padding: '4px' }}>medium</td>
                     <td style={{ padding: '4px' }}>~5GB</td>
                     <td style={{ padding: '4px' }}>~2x</td>
@@ -419,7 +497,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>turbo</td>
                     <td style={{ padding: '4px' }}>809M</td>
-                    <td style={{ padding: '4px' }}>N/A</td>
                     <td style={{ padding: '4px' }}>turbo</td>
                     <td style={{ padding: '4px' }}>~6GB</td>
                     <td style={{ padding: '4px' }}>~8x</td>
@@ -428,7 +505,6 @@ const Home = () => {
                     <tr>
                       <td style={{ padding: '4px' }}>large</td>
                       <td style={{ padding: '4px' }}>1550M</td>
-                      <td style={{ padding: '4px' }}>large-v3</td>
                       <td style={{ padding: '4px' }}>large-v3</td>
                       <td style={{ padding: '4px' }}>~10GB</td>
                       <td style={{ padding: '4px' }}>~1x</td>

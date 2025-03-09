@@ -2,17 +2,99 @@ import re
 from nltk.tokenize import sent_tokenize
 from config import logger
 import config  # Import the entire config module
-from modules.utils import similar
+from modules.utils import similar, get_model_path
+import langdetect
+import config
+from transformers import MBartForConditionalGeneration, MBartTokenizer
 from modules.models import load_summarizer
 
-def extract_important_sentences(transcript):
-    """Extract important sentences directly from transcript"""
-    # Look for sentences that contain signal phrases that suggest importance
-    important_markers = [
-        "important", "significant", "key", "critical", "crucial", "essential",
-        "main point", "highlight", "takeaway", "conclusion", "in summary",
-        "to summarize", "noteworthy", "remember", "notably", "specifically"
-    ]
+# Dictionary of language-specific markers for content analysis
+LANGUAGE_MARKERS = {
+    "en": {
+        "important_phrases": [
+            "important", "significant", "key", "critical", "crucial", "essential",
+            "main point", "highlight", "takeaway", "conclusion", "in summary",
+            "to summarize", "noteworthy", "remember", "notably", "specifically"
+        ]
+    },
+    "hi": {
+        "important_phrases": [
+            "महत्वपूर्ण", "मुख्य", "प्रमुख", "आवश्यक", "अनिवार्य", "महत्वपूर्ण बिंदु",
+            "मुख्य बिंदु", "निष्कर्ष", "सारांश", "संक्षेप में", "विशेष रूप से", "खास तौर पर"
+        ]
+    },
+    "bn": {
+        "important_phrases": [
+            "গুরুত্বপূর্ণ", "মূল", "প্রধান", "অপরিহার্য", "প্রয়োজনীয়", 
+            "মূল বিষয়", "সারসংক্ষেপ", "সংক্ষিপ্তসার", "বিশেষভাবে", "উল্লেখযোগ্য"
+        ]
+    }
+}
+
+# Global multilingual model cache
+multilingual_summarizers = {}
+
+# Update the model options for better Hindi and Bengali support
+def load_multilingual_summarizer(language):
+    """Load or retrieve language-specific summarization model"""
+    if language not in multilingual_summarizers:
+        logger.info(f"Loading multilingual summarizer for {language}")
+        
+        try:
+            # Get model path for storing models
+            model_path = get_model_path("summarizers")
+            
+            # Determine the best model for the language
+            if language == 'hi':
+                # IndicBART for Hindi
+                model_name = "ai4bharat/IndicBART"
+                tokenizer = MBartTokenizer.from_pretrained(model_name, cache_dir=model_path)
+                model = MBartForConditionalGeneration.from_pretrained(model_name, cache_dir=model_path)
+                tokenizer.src_lang = "hi_IN"
+            elif language == 'bn':
+                # MT5 for Bengali
+                from transformers import MT5ForConditionalGeneration, MT5Tokenizer
+                model_name = "google/mt5-base"
+                tokenizer = MT5Tokenizer.from_pretrained(model_name, cache_dir=model_path)
+                model = MT5ForConditionalGeneration.from_pretrained(model_name, cache_dir=model_path)
+            else:
+                # For other languages, use mBART-50
+                model_name = "facebook/mbart-large-50-one-to-many-mmt"
+                tokenizer = MBartTokenizer.from_pretrained(model_name, cache_dir=model_path)
+                model = MBartForConditionalGeneration.from_pretrained(model_name, cache_dir=model_path)
+                
+                # Set source language code for mBART-50
+                lang_code_map = {
+                    'fr': 'fr_XX', 'de': 'de_DE', 'es': 'es_XX', 
+                    'ru': 'ru_RU', 'zh': 'zh_CN', 'ja': 'ja_XX'
+                }
+                tokenizer.src_lang = lang_code_map.get(language, 'en_XX')
+            
+            multilingual_summarizers[language] = {
+                'model': model,
+                'tokenizer': tokenizer,
+                'model_type': 'mt5' if 'mt5' in model_name else 'mbart'
+            }
+            logger.info(f"Successfully loaded {model_name} model for {language}")
+            
+        except Exception as e:
+            logger.error(f"Failed to load multilingual model for {language}: {e}")
+            return None
+    
+    return multilingual_summarizers.get(language)
+
+def detect_language(text):
+    """Detect language of the text"""
+    try:
+        return langdetect.detect(text)
+    except:
+        return "en"  # Default to English if detection fails
+
+def extract_important_sentences(transcript, language="en"):
+    """Extract important sentences directly from transcript with language support"""
+    # Get language-specific markers or fall back to English
+    language_data = LANGUAGE_MARKERS.get(language, LANGUAGE_MARKERS["en"])
+    important_markers = language_data["important_phrases"]
     
     sentences = sent_tokenize(transcript)
     important_sentences = []
@@ -31,8 +113,42 @@ def extract_important_sentences(transcript):
     # Limit to 5 sentences to avoid overwhelming the key points section
     return important_sentences[:5]
 
-def generate_notes(transcript):
-    """Generate summary notes from transcript"""
+def generate_notes(transcript, language=None):
+    """Generate summary notes from transcript with language support"""
+    logger.info(f"Generating notes from transcript in language: {language or 'auto-detect'}")
+    
+    # Detect language if not specified
+    if not language:
+        language = detect_language(transcript)
+        logger.info(f"Detected language: {language}")
+    
+    # Always respect the user's explicitly chosen model
+    if config.current_summarizer_model:
+        logger.info(f"Using user-selected model: {config.current_summarizer_model}")
+        
+        # Load the specifically selected model
+        if config.current_summarizer_model in ["ai4bharat/IndicBART", "google/mt5-base", "facebook/mbart-large-50-one-to-many-mmt"]:
+            multilingual_model = load_multilingual_summarizer(language)
+            if multilingual_model:
+                # Log a notice if the selected model isn't ideal for the detected language
+                if config.current_summarizer_model == "ai4bharat/IndicBART" and language != "hi":
+                    logger.info(f"Note: IndicBART is optimized for Hindi but using it for {language} as requested")
+                elif config.current_summarizer_model == "google/mt5-base" and language != "bn":
+                    logger.info(f"Note: MT5 is optimized for Bengali but using it for {language} as requested")
+                
+                return generate_multilingual_notes(transcript, language, multilingual_model)
+    
+    # Previous conditional checks if no specific model was selected
+    # Now only reached if user hasn't explicitly chosen a model or if loading that model failed
+    
+    # Check if we should use a specialized model based on language
+    if language in ['hi', 'bn']:
+        logger.info(f"No specific model selected, choosing appropriate model for {language}")
+        multilingual_model = load_multilingual_summarizer(language)
+        if multilingual_model:
+            return generate_multilingual_notes(transcript, language, multilingual_model)
+    
+    # For English or other languages supported by the default summarizer
     logger.info("Generating notes from transcript")
     
     # Check if summarizer is available and properly initialized
@@ -236,4 +352,112 @@ def generate_notes(transcript):
             "summary": "Error generating summary: " + str(e)[:100] + "... Please try a different model.",
             "key_points": ["Could not generate key points due to an error."],
             "original_transcript": transcript
+        }
+
+def generate_multilingual_notes(transcript, language, model_data):
+    """Generate notes for non-English languages using specialized models"""
+    logger.info(f"Using specialized model for {language} summarization")
+    
+    try:
+        model = model_data['model']
+        tokenizer = model_data['tokenizer']
+        model_type = model_data.get('model_type', 'mbart')
+        
+        # Process in chunks due to token limits
+        chunks = []
+        current_chunk = ""
+        sentences = sent_tokenize(transcript)
+        
+        for sentence in sentences:
+            if len(current_chunk) + len(sentence) < 900:
+                current_chunk += " " + sentence
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        valid_chunks = [chunk for chunk in chunks if len(chunk) >= 50]
+        
+        if not valid_chunks:
+            return {
+                "summary": transcript[:1000] + "...",
+                "key_points": ["Transcript too short for key point extraction."],
+                "original_transcript": transcript,
+                "language": language
+            }
+        
+        all_summaries = []
+        
+        # Process differently based on model type
+        for chunk in valid_chunks[:3]:  # Process just a few chunks to avoid overwhelming the model
+            if model_type == 'mt5':
+                # MT5 model processing
+                prefix = "summarize: "
+                inputs = tokenizer(prefix + chunk, return_tensors="pt", max_length=1024, truncation=True)
+                
+                summary_ids = model.generate(
+                    inputs["input_ids"], 
+                    max_length=150, 
+                    min_length=40,
+                    length_penalty=2.0,
+                    num_beams=4,
+                    early_stopping=True
+                )
+                
+                summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+            else:
+                # mBART model processing
+                inputs = tokenizer(chunk, return_tensors="pt", max_length=1024, truncation=True)
+                
+                summary_ids = model.generate(
+                    inputs["input_ids"], 
+                    max_length=150, 
+                    min_length=30,
+                    num_beams=4,
+                    length_penalty=2.0,
+                    early_stopping=True
+                )
+                
+                summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+            
+            all_summaries.append(summary)
+        
+        # Extract key points using language-specific approach
+        key_points = extract_important_sentences(transcript, language)
+        
+        # For Indic languages, we might need additional post-processing
+        if language in ['hi', 'bn']:
+            # Try to split summaries into more coherent points
+            additional_points = []
+            for summary in all_summaries:
+                # For Hindi and Bengali, split on Devanagari purna viram and other markers
+                splits = re.split(r'[।|॥]|\.\s+', summary)
+                for split in splits:
+                    if len(split.strip()) > 50:
+                        additional_points.append(split.strip())
+            
+            # Add the additional points to key_points if they're not too similar
+            for point in additional_points:
+                if not any(similar(point, existing, threshold=0.7) for existing in key_points):
+                    key_points.append(point)
+        
+        notes = {
+            "summary": " ".join(all_summaries),
+            "key_points": key_points[:10],
+            "original_transcript": transcript,
+            "language": language
+        }
+        
+        return notes
+        
+    except Exception as e:
+        logger.error(f"Error in multilingual note generation: {str(e)}", exc_info=True)
+        return {
+            "summary": transcript[:1000] + "...",
+            "key_points": ["Could not generate key points due to an error."],
+            "original_transcript": transcript,
+            "language": language
         }

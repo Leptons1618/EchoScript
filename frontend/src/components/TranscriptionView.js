@@ -3,14 +3,14 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import './TranscriptionView.css';
-// Import icons from React Icons - removed unused imports
+// Import icons from React Icons - added the refresh icon
 import { 
   FiSearch, FiX,
-  FiCheck, FiAlertTriangle, FiSettings 
+  FiCheck, FiAlertTriangle, FiSettings, FiRefreshCw 
 } from 'react-icons/fi';
 import { 
   FaFilePdf, FaFileAlt, FaArrowUp, FaArrowDown, 
-  FaSpinner, FaPaperPlane 
+  FaSpinner, FaPaperPlane, FaClosedCaptioning 
 } from 'react-icons/fa';
 
 const TranscriptionView = () => {
@@ -777,6 +777,9 @@ const TranscriptionView = () => {
     
     return (
       <>
+        {/* Add transcript header with language info */}
+        {renderTranscriptHeader()}
+        
         <div className="transcript-search">
           {renderSearchControls()}
         </div>
@@ -798,6 +801,7 @@ const TranscriptionView = () => {
           <div className="notes-generating">
             <div className="notes-spinner"></div>
             <p>Generating smart notes from transcript...</p>
+            <span className="notes-progress">This may take a minute for longer videos</span>
           </div>
         );
       }
@@ -824,18 +828,34 @@ const TranscriptionView = () => {
                 disabled={isRegeneratingNotes}
                 title="Generate new summary from transcript"
               >
-                {isRegeneratingNotes ? 'Regenerating...' : 'Generate Again'}
+                {isRegeneratingNotes ? (
+                  <>
+                    <div className="spinner"></div>
+                    <span>Regenerating...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiRefreshCw />
+                    Generate Again
+                  </>
+                )}
               </button>
             </div>
           </div>
+          
           {regenerationError && (
             <div className="regeneration-error">{regenerationError}</div>
           )}
-          <p>{notes.summary}</p>
+          
+          <div className="summary-content">
+            <p>{notes.summary}</p>
+          </div>
         </div>
         
         <div className="notes-section">
-          <h3>Key Points</h3>
+          <div className="notes-header">
+            <h3>Key Points</h3>
+          </div>
           <ul className="key-points-list">
             {notes.key_points.map((point, index) => (
               <li key={index}>{point}</li>
@@ -845,7 +865,7 @@ const TranscriptionView = () => {
       </div>
     );
   };
-  
+
   // Revamped function to render processing logs with animation
   const renderProcessingLogs = () => {
     return (
@@ -925,6 +945,53 @@ const TranscriptionView = () => {
     );
   };
   
+  // Add the SRT conversion and download function
+  const exportAsSRT = () => {
+    if (!transcript || !transcript.segments) {
+      alert('No transcript available to export');
+      return;
+    }
+  
+    // Convert time from seconds to SRT format: HH:MM:SS,mmm
+    const formatSRTTime = (timeInSeconds) => {
+      const hours = Math.floor(timeInSeconds / 3600);
+      const minutes = Math.floor((timeInSeconds % 3600) / 60);
+      const seconds = Math.floor(timeInSeconds % 60);
+      const milliseconds = Math.floor((timeInSeconds % 1) * 1000);
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')},${milliseconds.toString().padStart(3, '0')}`;
+    };
+  
+    let srtContent = '';
+    transcript.segments.forEach((segment, index) => {
+      // Calculate end time (use next segment's start time or add 2 seconds if it's the last segment)
+      const endTime = transcript.segments[index + 1] 
+        ? transcript.segments[index + 1].start 
+        : segment.start + (segment.end ? segment.end - segment.start : 2);
+      
+      // Format as SRT entry
+      srtContent += `${index + 1}\n`;
+      srtContent += `${formatSRTTime(segment.start)} --> ${formatSRTTime(endTime)}\n`;
+      srtContent += `${segment.text}\n\n`;
+    });
+  
+    // Create a safe filename from video title
+    const safeTitle = transcript?.title?.replace(/[^a-z0-9]/gi, '_').substring(0, 20) || 'transcript';
+    const fileName = `${safeTitle}_${new Date().toISOString().slice(0,10)}.srt`;
+    
+    // Create and download the file
+    const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+    
+    // Clean up
+    setTimeout(() => {
+      URL.revokeObjectURL(link.href);
+    }, 100);
+  };
+  
   // Modified renderExportButtons to include Notion export button with disabled state
   const renderExportButtons = () => (
     <div className="export-options">
@@ -935,6 +1002,10 @@ const TranscriptionView = () => {
       <button className="export-button" onClick={exportAsTXT}>
         <FaFileAlt className="export-icon" />
         Export as TXT
+      </button>
+      <button className="export-button" onClick={exportAsSRT}>
+        <FaClosedCaptioning className="export-icon" />
+        Export as SRT
       </button>
       <button 
         className={`export-button notion-button ${notionExported ? 'exported' : ''}`} 
@@ -1140,104 +1211,203 @@ const TranscriptionView = () => {
     }
   };
 
-  // Add function to regenerate notes
-  const regenerateNotes = async () => {
-    if (!transcript || !jobId) return;
-    
-    setIsRegeneratingNotes(true);
-    setRegenerationError('');
-    
-    try {
-      const response = await fetch(`http://localhost:5000/api/regenerate_notes/${jobId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: selectedSummarizerModel
-        })
-      });
-      
-      if (response.ok) {
-        const updatedNotes = await response.json();
-        setNotes(updatedNotes);
-        
-        // Add success message to status history
-        const timestamp = new Date().toLocaleTimeString();
-        setStatusHistory(prev => [
-          ...prev, 
-          `[${timestamp}] Summary regenerated successfully with ${selectedSummarizerModel}!`
-        ]);
-        
-        // Hide the model selector if it's open
-        setShowModelSelector(false);
-      } else {
-        const errorData = await response.json();
-        setRegenerationError(errorData.error || 'Failed to regenerate summary');
-      }
-    } catch (err) {
-      console.error('Error regenerating notes:', err);
-      setRegenerationError('Error connecting to server');
-    } finally {
-      setIsRegeneratingNotes(false);
-    }
-  };
-
-  // Fetch available summarizer models
-  useEffect(() => {
-    fetch('http://localhost:5000/api/config')
-      .then(res => res.json())
-      .then(data => {
-        if (data.available_summarizers) {
-          setAvailableSummarizers(data.available_summarizers);
-          setSelectedSummarizerModel(data.summarizer_model || Object.keys(data.available_summarizers)[0]);
-        }
-      })
-      .catch(err => console.error("Error loading summarizers:", err));
-  }, []);
-
-  // Add model selector modal
-  const renderModelSelectorModal = () => {
-    if (!showModelSelector) return null;
+  // Add language display in transcript view with enhanced styling
+  const renderTranscriptHeader = () => {
+    if (!transcript) return null;
     
     return (
-      <div className="model-selector-overlay" onClick={() => setShowModelSelector(false)}>
-        <div className="model-selector-modal" onClick={e => e.stopPropagation()}>
-          <h3>Select Summarizer Model</h3>
-          <div className="model-list">
-            {Object.keys(availableSummarizers).map(key => (
-              <div 
-                key={key} 
-                className={`model-option ${selectedSummarizerModel === key ? 'selected' : ''}`}
-                onClick={() => setSelectedSummarizerModel(key)}
-              >
-                <div className="model-option-header">
-                  <div className="model-name">{key}</div>
-                  <div className="model-size">{availableSummarizers[key].size}</div>
-                </div>
-                <div className="model-description">{availableSummarizers[key].description}</div>
-              </div>
-            ))}
+      <div className="transcript-header">
+        <h3>{transcript.title || "Transcript"}</h3>
+        {transcript.channel && <p className="transcript-channel">Channel: {transcript.channel}</p>}
+        {transcript.language && (
+          <div className="language-badge">
+            <span className="language-label">Language:</span>
+            <span className="language-name">{getLanguageName(transcript.language)}</span>
           </div>
-          <div className="model-selector-actions">
-            <button 
-              className="cancel-button" 
-              onClick={() => setShowModelSelector(false)}
-            >
-              Cancel
-            </button>
-            <button 
-              className="regenerate-button"
-              onClick={regenerateNotes}
-              disabled={isRegeneratingNotes}
-            >
-              {isRegeneratingNotes ? 'Regenerating...' : 'Generate with Selected Model'}
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     );
   };
+
+  // Helper function to display language names
+  const getLanguageName = (code) => {
+    const languages = {
+      'en': 'English',
+      'hi': 'Hindi',
+      'bn': 'Bengali',
+      // Add more languages as needed
+    };
+    return languages[code] || code;
+  };
+
+  // Add regenerateNotes function before the return statement
+const regenerateNotes = async () => {
+  setIsRegeneratingNotes(true);
+  setRegenerationError('');
+  
+  // Close model selector immediately for better UX
+  setShowModelSelector(false);
+  
+  try {
+    const response = await fetch(`http://localhost:5000/api/regenerate_notes/${jobId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: selectedSummarizerModel || undefined
+      }),
+    });
+    
+    if (response.ok) {
+      const newNotes = await response.json();
+      setNotes(newNotes);
+      // Show success message or notification here if desired
+    } else {
+      const errorData = await response.json();
+      setRegenerationError(errorData.error || 'Failed to regenerate notes');
+    }
+  } catch (err) {
+    setRegenerationError('Error connecting to server');
+    console.error(err);
+  } finally {
+    setIsRegeneratingNotes(false);
+  }
+};
+
+// Add renderModelSelectorModal function before the return statement
+const renderModelSelectorModal = () => {
+  if (!showModelSelector) return null;
+  
+  // Create a sorted list of models with specialized ones first
+  const sortedModels = Object.keys(availableSummarizers).sort((a, b) => {
+    // Put models for current transcript language first
+    const aIsSpecialized = transcript?.language && availableSummarizers[a]?.languages?.includes(transcript.language);
+    const bIsSpecialized = transcript?.language && availableSummarizers[b]?.languages?.includes(transcript.language);
+    
+    if (aIsSpecialized && !bIsSpecialized) return -1;
+    if (!aIsSpecialized && bIsSpecialized) return 1;
+    
+    // Then sort alphabetically
+    return a.localeCompare(b);
+  });
+  
+  // Helper to get display name for model
+  const getModelDisplayName = (modelId) => {
+    if (modelId.includes('/')) {
+      const parts = modelId.split('/');
+      return `${parts[1]} (${parts[0]})`;
+    }
+    return modelId;
+  };
+  
+  return (
+    <div className="model-selector-overlay" onClick={() => setShowModelSelector(false)}>
+      <div className="model-selector-modal" onClick={e => e.stopPropagation()}>
+        <div className="model-selector-header">
+          <h3>Select Summarization Model</h3>
+          <button className="model-selector-close" onClick={() => setShowModelSelector(false)}>
+            <FiX />
+          </button>
+        </div>
+        
+        <div className="model-selector-content">
+          <div className="model-selector-description">
+            Choose a model to generate summaries and key points from your transcript.
+            {transcript?.language && transcript.language !== 'en' && (
+              <div className="language-notice">
+                <span className="language-icon">🌐</span>
+                <span>Your transcript is in {getLanguageName(transcript.language)}. Models with a star (★) are optimized for this language.</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="model-selector-list">
+            {sortedModels.map(modelId => {
+              const model = availableSummarizers[modelId];
+              const isSpecialized = transcript?.language && model?.languages?.includes(transcript.language);
+              
+              return (
+                <div 
+                  key={modelId}
+                  className={`model-option ${selectedSummarizerModel === modelId ? 'selected' : ''} ${isSpecialized ? 'specialized' : ''}`}
+                  onClick={() => setSelectedSummarizerModel(modelId)}
+                >
+                  <div className="model-option-header">
+                    <div className="model-option-name">
+                      {getModelDisplayName(modelId)}
+                      {isSpecialized && <span className="specialized-badge">★</span>}
+                    </div>
+                    {model.size && <div className="model-option-size">{model.size}</div>}
+                  </div>
+                  <div className="model-option-description">{model.description}</div>
+                  {isSpecialized && (
+                    <div className="model-language-support">
+                      Optimized for {getLanguageName(transcript.language)}
+                    </div>
+                  )}
+                  {model.languages && model.languages.length > 0 && !isSpecialized && (
+                    <div className="model-language-support-general">
+                      Supports multiple languages
+                    </div>
+                  )}
+                  <div className="model-option-radio">
+                    <div className={`radio-button ${selectedSummarizerModel === modelId ? 'checked' : ''}`}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        <div className="model-selector-footer">
+          <button 
+            className="model-selector-cancel" 
+            onClick={() => setShowModelSelector(false)}
+          >
+            Cancel
+          </button>
+          <button 
+            className="model-selector-apply" 
+            onClick={regenerateNotes}
+            disabled={isRegeneratingNotes}
+          >
+            {isRegeneratingNotes ? (
+              <>
+                <div className="spinner"></div>
+                <span>Regenerating...</span>
+              </>
+            ) : (
+              <>
+                <FiRefreshCw />
+                <span>Apply & Regenerate</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Also add a useEffect to load available summarizers
+useEffect(() => {
+  const fetchSummarizers = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/config');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.available_summarizers) {
+          setAvailableSummarizers(data.available_summarizers);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching summarizer models:', error);
+    }
+  };
+  
+  fetchSummarizers();
+}, []); // Run once on component mount
 
   return (
     <div className="transcription-view">
