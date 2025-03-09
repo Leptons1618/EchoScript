@@ -108,6 +108,9 @@ def load_summarizer(model_name=None):
     logger.info(f"Loading summarization model: {model_name}")
     
     try:
+        # Define model path for saving downloaded models
+        model_path = get_model_path("summarizers")
+        
         # For specialized Indic language models, we don't load them here
         # They'll be loaded on-demand in the generate_notes function
         if (model_name in ["ai4bharat/IndicBART", "google/mt5-base"] or
@@ -116,13 +119,16 @@ def load_summarizer(model_name=None):
             config.summarizer = None  # Will use specialized loader
             config.summarizer_model = model_name
             config.summarizer_status = "loaded"
+            # Store the model path for later use
+            config.summarizer_path = model_path
             return True
         
-        # Standard models using the pipeline
+        # Standard models using the pipeline with cache_dir to save models
         config.summarizer = pipeline(
             "summarization", 
             model=model_name, 
-            device=0 if torch.cuda.is_available() else -1
+            device=0 if torch.cuda.is_available() else -1,
+            model_kwargs={"cache_dir": model_path}
         )
         config.summarizer_model = model_name
         config.summarizer_status = "loaded"

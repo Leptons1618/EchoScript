@@ -59,3 +59,21 @@ transcription_model = None
 current_whisper_model_size = None
 summarizer = None
 current_summarizer_model = "bart-large-cnn"
+
+# Set up paths for different model types
+MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
+AUDIO_DIR = os.path.join(os.path.dirname(__file__), 'downloads')
+TRANSCRIPT_DIR = os.path.join(os.path.dirname(__file__), 'transcripts')
+NOTES_DIR = os.path.join(os.path.dirname(__file__), 'notes')
+LOGS_DIR = os.path.join(os.path.dirname(__file__), 'logs')
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
+
+# Ensure directories exist
+for dir_path in [MODEL_DIR, AUDIO_DIR, TRANSCRIPT_DIR, NOTES_DIR, LOGS_DIR]:
+    os.makedirs(dir_path, exist_ok=True)
+    
+# Create summarizer models directory as well
+os.makedirs(os.path.join(MODEL_DIR, 'summarizers'), exist_ok=True)
+
+# Add path for storing summarizer model
+summarizer_path = None

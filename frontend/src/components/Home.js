@@ -341,8 +341,10 @@ const Home = () => {
             background: 'white',
             padding: '30px',
             borderRadius: '12px',
-            width: '480px',  // Same width for both model types
-            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+            width: '550px',  // Increased from 520px for more horizontal space
+            maxHeight: '90vh',  // Increased from 85vh to 90vh for more vertical space
+            overflow: 'auto',  // Added scrolling if needed
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)', // Enhanced shadow
             textAlign: 'center'
           }}>
             <h2 style={{ fontSize: '1.3rem', marginBottom: '20px' }}>Model Configuration</h2>
@@ -458,7 +460,6 @@ const Home = () => {
                   <tr>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Size</th>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Params</th>
-                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Eng-only</th>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Multi</th>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>VRAM</th>
                     <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Speed</th>
@@ -468,7 +469,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>tiny</td>
                     <td style={{ padding: '4px' }}>39M</td>
-                    <td style={{ padding: '4px' }}>tiny.en</td>
                     <td style={{ padding: '4px' }}>tiny</td>
                     <td style={{ padding: '4px' }}>~1GB</td>
                     <td style={{ padding: '4px' }}>~10x</td>
@@ -476,7 +476,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>base</td>
                     <td style={{ padding: '4px' }}>74M</td>
-                    <td style={{ padding: '4px' }}>base.en</td>
                     <td style={{ padding: '4px' }}>base</td>
                     <td style={{ padding: '4px' }}>~1GB</td>
                     <td style={{ padding: '4px' }}>~7x</td>
@@ -484,7 +483,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>small</td>
                     <td style={{ padding: '4px' }}>244M</td>
-                    <td style={{ padding: '4px' }}>small.en</td>
                     <td style={{ padding: '4px' }}>small</td>
                     <td style={{ padding: '4px' }}>~2GB</td>
                     <td style={{ padding: '4px' }}>~4x</td>
@@ -492,7 +490,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>medium</td>
                     <td style={{ padding: '4px' }}>769M</td>
-                    <td style={{ padding: '4px' }}>medium.en</td>
                     <td style={{ padding: '4px' }}>medium</td>
                     <td style={{ padding: '4px' }}>~5GB</td>
                     <td style={{ padding: '4px' }}>~2x</td>
@@ -500,7 +497,6 @@ const Home = () => {
                   <tr>
                     <td style={{ padding: '4px' }}>turbo</td>
                     <td style={{ padding: '4px' }}>809M</td>
-                    <td style={{ padding: '4px' }}>N/A</td>
                     <td style={{ padding: '4px' }}>turbo</td>
                     <td style={{ padding: '4px' }}>~6GB</td>
                     <td style={{ padding: '4px' }}>~8x</td>
@@ -509,7 +505,6 @@ const Home = () => {
                     <tr>
                       <td style={{ padding: '4px' }}>large</td>
                       <td style={{ padding: '4px' }}>1550M</td>
-                      <td style={{ padding: '4px' }}>large-v3</td>
                       <td style={{ padding: '4px' }}>large-v3</td>
                       <td style={{ padding: '4px' }}>~10GB</td>
                       <td style={{ padding: '4px' }}>~1x</td>

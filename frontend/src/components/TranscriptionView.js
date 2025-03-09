@@ -3,14 +3,14 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import './TranscriptionView.css';
-// Import icons from React Icons - removed unused imports
+// Import icons from React Icons - added the refresh icon
 import { 
   FiSearch, FiX,
-  FiCheck, FiAlertTriangle, FiSettings 
+  FiCheck, FiAlertTriangle, FiSettings, FiRefreshCw 
 } from 'react-icons/fi';
 import { 
   FaFilePdf, FaFileAlt, FaArrowUp, FaArrowDown, 
-  FaSpinner, FaPaperPlane 
+  FaSpinner, FaPaperPlane, FaClosedCaptioning 
 } from 'react-icons/fa';
 
 const TranscriptionView = () => {
@@ -801,6 +801,7 @@ const TranscriptionView = () => {
           <div className="notes-generating">
             <div className="notes-spinner"></div>
             <p>Generating smart notes from transcript...</p>
+            <span className="notes-progress">This may take a minute for longer videos</span>
           </div>
         );
       }
@@ -827,18 +828,34 @@ const TranscriptionView = () => {
                 disabled={isRegeneratingNotes}
                 title="Generate new summary from transcript"
               >
-                {isRegeneratingNotes ? 'Regenerating...' : 'Generate Again'}
+                {isRegeneratingNotes ? (
+                  <>
+                    <div className="spinner"></div>
+                    <span>Regenerating...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiRefreshCw />
+                    Generate Again
+                  </>
+                )}
               </button>
             </div>
           </div>
+          
           {regenerationError && (
             <div className="regeneration-error">{regenerationError}</div>
           )}
-          <p>{notes.summary}</p>
+          
+          <div className="summary-content">
+            <p>{notes.summary}</p>
+          </div>
         </div>
         
         <div className="notes-section">
-          <h3>Key Points</h3>
+          <div className="notes-header">
+            <h3>Key Points</h3>
+          </div>
           <ul className="key-points-list">
             {notes.key_points.map((point, index) => (
               <li key={index}>{point}</li>
@@ -848,7 +865,7 @@ const TranscriptionView = () => {
       </div>
     );
   };
-  
+
   // Revamped function to render processing logs with animation
   const renderProcessingLogs = () => {
     return (
@@ -928,6 +945,53 @@ const TranscriptionView = () => {
     );
   };
   
+  // Add the SRT conversion and download function
+  const exportAsSRT = () => {
+    if (!transcript || !transcript.segments) {
+      alert('No transcript available to export');
+      return;
+    }
+  
+    // Convert time from seconds to SRT format: HH:MM:SS,mmm
+    const formatSRTTime = (timeInSeconds) => {
+      const hours = Math.floor(timeInSeconds / 3600);
+      const minutes = Math.floor((timeInSeconds % 3600) / 60);
+      const seconds = Math.floor(timeInSeconds % 60);
+      const milliseconds = Math.floor((timeInSeconds % 1) * 1000);
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')},${milliseconds.toString().padStart(3, '0')}`;
+    };
+  
+    let srtContent = '';
+    transcript.segments.forEach((segment, index) => {
+      // Calculate end time (use next segment's start time or add 2 seconds if it's the last segment)
+      const endTime = transcript.segments[index + 1] 
+        ? transcript.segments[index + 1].start 
+        : segment.start + (segment.end ? segment.end - segment.start : 2);
+      
+      // Format as SRT entry
+      srtContent += `${index + 1}\n`;
+      srtContent += `${formatSRTTime(segment.start)} --> ${formatSRTTime(endTime)}\n`;
+      srtContent += `${segment.text}\n\n`;
+    });
+  
+    // Create a safe filename from video title
+    const safeTitle = transcript?.title?.replace(/[^a-z0-9]/gi, '_').substring(0, 20) || 'transcript';
+    const fileName = `${safeTitle}_${new Date().toISOString().slice(0,10)}.srt`;
+    
+    // Create and download the file
+    const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+    
+    // Clean up
+    setTimeout(() => {
+      URL.revokeObjectURL(link.href);
+    }, 100);
+  };
+  
   // Modified renderExportButtons to include Notion export button with disabled state
   const renderExportButtons = () => (
     <div className="export-options">
@@ -938,6 +1002,10 @@ const TranscriptionView = () => {
       <button className="export-button" onClick={exportAsTXT}>
         <FaFileAlt className="export-icon" />
         Export as TXT
+      </button>
+      <button className="export-button" onClick={exportAsSRT}>
+        <FaClosedCaptioning className="export-icon" />
+        Export as SRT
       </button>
       <button 
         className={`export-button notion-button ${notionExported ? 'exported' : ''}`} 
@@ -1177,6 +1245,9 @@ const regenerateNotes = async () => {
   setIsRegeneratingNotes(true);
   setRegenerationError('');
   
+  // Close model selector immediately for better UX
+  setShowModelSelector(false);
+  
   try {
     const response = await fetch(`http://localhost:5000/api/regenerate_notes/${jobId}`, {
       method: 'POST',
@@ -1201,7 +1272,6 @@ const regenerateNotes = async () => {
     console.error(err);
   } finally {
     setIsRegeneratingNotes(false);
-    setShowModelSelector(false); // Close the model selector if open
   }
 };
 
@@ -1209,62 +1279,111 @@ const regenerateNotes = async () => {
 const renderModelSelectorModal = () => {
   if (!showModelSelector) return null;
   
+  // Create a sorted list of models with specialized ones first
+  const sortedModels = Object.keys(availableSummarizers).sort((a, b) => {
+    // Put models for current transcript language first
+    const aIsSpecialized = transcript?.language && availableSummarizers[a]?.languages?.includes(transcript.language);
+    const bIsSpecialized = transcript?.language && availableSummarizers[b]?.languages?.includes(transcript.language);
+    
+    if (aIsSpecialized && !bIsSpecialized) return -1;
+    if (!aIsSpecialized && bIsSpecialized) return 1;
+    
+    // Then sort alphabetically
+    return a.localeCompare(b);
+  });
+  
+  // Helper to get display name for model
+  const getModelDisplayName = (modelId) => {
+    if (modelId.includes('/')) {
+      const parts = modelId.split('/');
+      return `${parts[1]} (${parts[0]})`;
+    }
+    return modelId;
+  };
+  
   return (
-    <div className="notion-modal-overlay show" onClick={() => setShowModelSelector(false)}>
-      <div className="notion-modal" onClick={e => e.stopPropagation()}>
-        <h3>Select Summarization Model</h3>
+    <div className="model-selector-overlay" onClick={() => setShowModelSelector(false)}>
+      <div className="model-selector-modal" onClick={e => e.stopPropagation()}>
+        <div className="model-selector-header">
+          <h3>Select Summarization Model</h3>
+          <button className="model-selector-close" onClick={() => setShowModelSelector(false)}>
+            <FiX />
+          </button>
+        </div>
         
-        <div className="notion-form">
-          <div className="form-group">
-            <label htmlFor="summarizer-model">Choose a model:</label>
-            <select
-              id="summarizer-model"
-              value={selectedSummarizerModel}
-              onChange={(e) => setSelectedSummarizerModel(e.target.value)}
-              className="model-selector"
-            >
-              <option value="">Default</option>
-              {Object.keys(availableSummarizers).map(key => (
-                <option key={key} value={key} className={
-                  transcript?.language && availableSummarizers[key]?.languages?.includes(transcript.language)
-                    ? 'specialized-option'
-                    : ''
-                }>
-                  {key.includes('/') ? key.split('/')[1] : key}
-                  {transcript?.language && availableSummarizers[key]?.languages?.includes(transcript.language) && ' ★'}
-                </option>
-              ))}
-            </select>
+        <div className="model-selector-content">
+          <div className="model-selector-description">
+            Choose a model to generate summaries and key points from your transcript.
+            {transcript?.language && transcript.language !== 'en' && (
+              <div className="language-notice">
+                <span className="language-icon">🌐</span>
+                <span>Your transcript is in {getLanguageName(transcript.language)}. Models with a star (★) are optimized for this language.</span>
+              </div>
+            )}
           </div>
           
-          {selectedSummarizerModel && availableSummarizers[selectedSummarizerModel] && (
-            <div className="model-info">
-              <p>{availableSummarizers[selectedSummarizerModel].description}</p>
-              {transcript?.language && availableSummarizers[selectedSummarizerModel]?.languages?.includes(transcript.language) && (
-                <p className="language-match">
-                  <span role="img" aria-label="Star">⭐</span> Optimized for {transcript.language}
-                </p>
-              )}
-            </div>
-          )}
-          
-          <div className="notion-actions">
-            <button 
-              className="notion-cancel" 
-              onClick={() => setShowModelSelector(false)}
-            >
-              Cancel
-            </button>
-            <button 
-              className="notion-submit" 
-              onClick={() => {
-                regenerateNotes();
-              }}
-              disabled={isRegeneratingNotes}
-            >
-              {isRegeneratingNotes ? 'Regenerating...' : 'Regenerate Notes'}
-            </button>
+          <div className="model-selector-list">
+            {sortedModels.map(modelId => {
+              const model = availableSummarizers[modelId];
+              const isSpecialized = transcript?.language && model?.languages?.includes(transcript.language);
+              
+              return (
+                <div 
+                  key={modelId}
+                  className={`model-option ${selectedSummarizerModel === modelId ? 'selected' : ''} ${isSpecialized ? 'specialized' : ''}`}
+                  onClick={() => setSelectedSummarizerModel(modelId)}
+                >
+                  <div className="model-option-header">
+                    <div className="model-option-name">
+                      {getModelDisplayName(modelId)}
+                      {isSpecialized && <span className="specialized-badge">★</span>}
+                    </div>
+                    {model.size && <div className="model-option-size">{model.size}</div>}
+                  </div>
+                  <div className="model-option-description">{model.description}</div>
+                  {isSpecialized && (
+                    <div className="model-language-support">
+                      Optimized for {getLanguageName(transcript.language)}
+                    </div>
+                  )}
+                  {model.languages && model.languages.length > 0 && !isSpecialized && (
+                    <div className="model-language-support-general">
+                      Supports multiple languages
+                    </div>
+                  )}
+                  <div className="model-option-radio">
+                    <div className={`radio-button ${selectedSummarizerModel === modelId ? 'checked' : ''}`}></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </div>
+        
+        <div className="model-selector-footer">
+          <button 
+            className="model-selector-cancel" 
+            onClick={() => setShowModelSelector(false)}
+          >
+            Cancel
+          </button>
+          <button 
+            className="model-selector-apply" 
+            onClick={regenerateNotes}
+            disabled={isRegeneratingNotes}
+          >
+            {isRegeneratingNotes ? (
+              <>
+                <div className="spinner"></div>
+                <span>Regenerating...</span>
+              </>
+            ) : (
+              <>
+                <FiRefreshCw />
+                <span>Apply & Regenerate</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

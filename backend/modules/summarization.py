@@ -2,11 +2,11 @@ import re
 from nltk.tokenize import sent_tokenize
 from config import logger
 import config  # Import the entire config module
-from modules.utils import similar
+from modules.utils import similar, get_model_path
 import langdetect
 import config
 from transformers import MBartForConditionalGeneration, MBartTokenizer
-from modules.summarization import load_summarizer
+from modules.models import load_summarizer
 
 # Dictionary of language-specific markers for content analysis
 LANGUAGE_MARKERS = {
@@ -41,24 +41,27 @@ def load_multilingual_summarizer(language):
         logger.info(f"Loading multilingual summarizer for {language}")
         
         try:
+            # Get model path for storing models
+            model_path = get_model_path("summarizers")
+            
             # Determine the best model for the language
             if language == 'hi':
                 # IndicBART for Hindi
                 model_name = "ai4bharat/IndicBART"
-                tokenizer = MBartTokenizer.from_pretrained(model_name)
-                model = MBartForConditionalGeneration.from_pretrained(model_name)
+                tokenizer = MBartTokenizer.from_pretrained(model_name, cache_dir=model_path)
+                model = MBartForConditionalGeneration.from_pretrained(model_name, cache_dir=model_path)
                 tokenizer.src_lang = "hi_IN"
             elif language == 'bn':
                 # MT5 for Bengali
                 from transformers import MT5ForConditionalGeneration, MT5Tokenizer
                 model_name = "google/mt5-base"
-                tokenizer = MT5Tokenizer.from_pretrained(model_name)
-                model = MT5ForConditionalGeneration.from_pretrained(model_name)
+                tokenizer = MT5Tokenizer.from_pretrained(model_name, cache_dir=model_path)
+                model = MT5ForConditionalGeneration.from_pretrained(model_name, cache_dir=model_path)
             else:
                 # For other languages, use mBART-50
                 model_name = "facebook/mbart-large-50-one-to-many-mmt"
-                tokenizer = MBartTokenizer.from_pretrained(model_name)
-                model = MBartForConditionalGeneration.from_pretrained(model_name)
+                tokenizer = MBartTokenizer.from_pretrained(model_name, cache_dir=model_path)
+                model = MBartForConditionalGeneration.from_pretrained(model_name, cache_dir=model_path)
                 
                 # Set source language code for mBART-50
                 lang_code_map = {
@@ -119,22 +122,28 @@ def generate_notes(transcript, language=None):
         language = detect_language(transcript)
         logger.info(f"Detected language: {language}")
     
+    # Always respect the user's explicitly chosen model
+    if config.current_summarizer_model:
+        logger.info(f"Using user-selected model: {config.current_summarizer_model}")
+        
+        # Load the specifically selected model
+        if config.current_summarizer_model in ["ai4bharat/IndicBART", "google/mt5-base", "facebook/mbart-large-50-one-to-many-mmt"]:
+            multilingual_model = load_multilingual_summarizer(language)
+            if multilingual_model:
+                # Log a notice if the selected model isn't ideal for the detected language
+                if config.current_summarizer_model == "ai4bharat/IndicBART" and language != "hi":
+                    logger.info(f"Note: IndicBART is optimized for Hindi but using it for {language} as requested")
+                elif config.current_summarizer_model == "google/mt5-base" and language != "bn":
+                    logger.info(f"Note: MT5 is optimized for Bengali but using it for {language} as requested")
+                
+                return generate_multilingual_notes(transcript, language, multilingual_model)
+    
+    # Previous conditional checks if no specific model was selected
+    # Now only reached if user hasn't explicitly chosen a model or if loading that model failed
+    
     # Check if we should use a specialized model based on language
     if language in ['hi', 'bn']:
-        # If we have a selected Indic model, use it
-        if language == 'hi' and config.summarizer_model == 'ai4bharat/IndicBART':
-            logger.info("Using specialized IndicBART model for Hindi")
-            multilingual_model = load_multilingual_summarizer(language)
-            if multilingual_model:
-                return generate_multilingual_notes(transcript, language, multilingual_model)
-        elif language == 'bn' and config.summarizer_model == 'google/mt5-base':
-            logger.info("Using specialized mT5 model for Bengali") 
-            multilingual_model = load_multilingual_summarizer(language)
-            if multilingual_model:
-                return generate_multilingual_notes(transcript, language, multilingual_model)
-        
-        # If no specific model was selected, use default multilingual approach
-        logger.info(f"No specialized model selected, using default approach for {language}")
+        logger.info(f"No specific model selected, choosing appropriate model for {language}")
         multilingual_model = load_multilingual_summarizer(language)
         if multilingual_model:
             return generate_multilingual_notes(transcript, language, multilingual_model)
