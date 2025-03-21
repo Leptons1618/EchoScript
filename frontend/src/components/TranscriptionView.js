@@ -1316,8 +1316,10 @@ const renderModelSelectorModal = () => {
             Choose a model to generate summaries and key points from your transcript.
             {transcript?.language && transcript.language !== 'en' && (
               <div className="language-notice">
-                <span className="language-icon">🌐</span>
-                <span>Your transcript is in {getLanguageName(transcript.language)}. Models with a star (★) are optimized for this language.</span>
+                <span className="language-icon" role="img" aria-label="globe">🌐</span>
+                <span>Your transcript is in {getLanguageName(transcript.language)}. Models with a star 
+                  (<span className="specialized-badge" role="img" aria-label="specialized model">★</span>) are optimized for this language.
+                </span>
               </div>
             )}
           </div>
