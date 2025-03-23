@@ -146,7 +146,7 @@
 }
 
 .transcript-container {
-  max-height: 500px;
+  max-height: 700px;  /* Increased from 500px */
   overflow-y: auto;
   margin-bottom: 30px;
   scrollbar-width: thin;
@@ -637,7 +637,7 @@ body.dark .search-input:focus {
   border-radius: 8px;
   font-size: 0.9rem;
   color: #4b5563;
-  max-height: 500px;
+  max-height: 700px;
   overflow-y: auto;
 }
 
@@ -1049,7 +1049,7 @@ body.dark .scroll-dot:nth-child(3) {
   border-radius: 6px;
   font-size: 0.9rem;
   color: var(--color-text);
-  max-height: 500px;
+  max-height: 700px;
   overflow-y: auto;
   margin-top: 20px;
 }

@@ -61,7 +61,7 @@ def get_available_summarizers():
     """Return dict of available summarization models"""
     available = {
         # Standard models
-        "bart-large-cnn": {
+        "facebook/bart-large-cnn": {
             "size": "large", 
             "description": "High quality English summarization model"
         },
@@ -103,7 +103,7 @@ def load_summarizer(model_name=None):
     
     # Use default if none specified
     if not model_name or model_name not in available_models:
-        model_name = "bart-large-cnn"
+        model_name = "facebook/bart-large-cnn"
     
     logger.info(f"Loading summarization model: {model_name}")
     

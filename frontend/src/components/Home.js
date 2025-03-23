@@ -204,9 +204,9 @@ const Home = () => {
   return (
     <div className="home-container">
       <div className="hero-section">
-        <h1 style={{ fontSize: '2rem' }}>YouTube Transcriber Pro</h1>
-        <p style={{ fontSize: '1rem' }} className="subtitle">
-          Transcribe, analyze, and take notes from any YouTube video
+        <h1>EchoScript<span className="accent">AI</span></h1>
+        <p className="subtitle">
+          Transform videos into intelligent content with multilingual AI transcription
         </p>
 
         <form onSubmit={handleSubmit} className="url-form">
@@ -215,7 +215,7 @@ const Home = () => {
               type="text"
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
-              placeholder="Paste YouTube URL here..."
+              placeholder="Enter YouTube URL to analyze..."
               className="url-input"
               disabled={isSubmitting || modelLoadStatus !== "loaded"}
             />
@@ -224,325 +224,222 @@ const Home = () => {
               className="submit-button"
               disabled={isSubmitting || modelLoadStatus !== "loaded" || !isValidYoutubeUrl(youtubeUrl)}
             >
-              {isSubmitting ? 'Processing...' : 'Transcribe'}
+              {isSubmitting ? 'Processing...' : 'Analyze'}
             </button>
-            {/* Replace cog gif with FiSettings icon */}
             <button 
               type="button" 
               className="config-button" 
               onClick={() => setShowConfig(true)}
               disabled={isSubmitting}
               title="Configure Model"
-              style={{ marginLeft: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
             >
-              <FiSettings className="config-icon" size={24} />
+              <FiSettings className="config-icon" />
             </button>
           </div>
           {error && <p className="error-message">{error}</p>}
         </form>
 
-        {/* Display loading/loaded model status */}
         {renderModelStatus()}
       </div>
 
       <div className="features-section">
-        <h2 style={{ fontSize: '1.5rem' }}>Advanced Features</h2>
-        <div className="features-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        <div className="features-grid">
           <div className="feature-card">
-            {/* Replace emoji with icon */}
             <div className="feature-icon"><FaFileAlt /></div>
-            <h3 style={{ fontSize: '1.1rem' }}>Accurate Transcription</h3>
-            <p>Powered by OpenAI's Whisper, our system delivers high-quality transcriptions</p>
+            <h3>Advanced Transcription</h3>
+            <p>State-of-the-art speech recognition with 50+ language support</p>
           </div>
           <div className="feature-card">
-            {/* Replace emoji with icon */}
             <div className="feature-icon"><FaChartBar /></div>
-            <h3 style={{ fontSize: '1.1rem' }}>Smart Notes</h3>
-            <p>AI-generated notes that capture key points and summarize content</p>
+            <h3>Smart Analysis</h3>
+            <p>AI-powered summary and key points extraction</p>
           </div>
           <div className="feature-card">
-            {/* Replace emoji with icon */}
             <div className="feature-icon"><FaClock /></div>
-            <h3 style={{ fontSize: '1.1rem' }}>Time-Stamped</h3>
-            <p>Navigate through transcripts with precise time markers</p>
+            <h3>Timestamped</h3>
+            <p>Precise navigation with interactive timestamps</p>
           </div>
           <div className="feature-card">
-            {/* Replace emoji with icon */}
             <div className="feature-icon"><FaSave /></div>
-            <h3 style={{ fontSize: '1.1rem' }}>Save & Export</h3>
-            <p>Download transcripts and notes in multiple formats</p>
-          </div>
-          {/* New Multilingual Support Card */}
-          <div className="feature-card multilingual-card">
-            <div className="feature-icon">
-              <span role="img" aria-label="Globe">🌐</span>
-            </div>
-            <h3 style={{ fontSize: '1.1rem' }}>Multilingual Support</h3>
-            <p>Enhanced support for Hindi and Bengali with specialized AI models</p>
+            <h3>Export & Share</h3>
+            <p>Notion integration and multiple export formats</p>
           </div>
         </div>
       </div>
 
-      {/* About Section - remove the backgroundColor from inline styles */}
-      <div
-        className="about-section"
-        style={{
-          padding: '20px',
-          textAlign: 'center',
-          borderRadius: '12px',
-          marginTop: '20px',
-          fontSize: '0.8rem' // Reduced overall font size for the about section
-        }}
-      >
-        <h2 style={{ fontSize: '1.1rem' }}>About</h2>
-        <p>YT Transcriber Pro is developed by Lept0n5.</p>
-        <div
-          className="social-links"
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: '20px',
-            fontSize: '0.9rem' // Reduced social links font size
-          }}
-        >
-          <a
-            href="https://www.linkedin.com/in/anish-giri-a4031723a/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            LinkedIn
-          </a>
-          <a
-            href="https://github.com/Leptons1618"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub
-          </a>
-          <a href="mailto:anishgiri163@gmail.com">Email Me</a>
-        </div>
+      <div className="about-section">
+        <p>
+          <a href="https://github.com/Leptons1618" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <span className="divider">•</span>
+          <a href="https://www.linkedin.com/in/anish-giri-a4031723a/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <span className="divider">•</span>
+          <a href="mailto:anishgiri163@gmail.com">Contact</a>
+        </p>
       </div>
 
       {/* Configuration Modal */}
       {showConfig && (
-        <div className="config-modal" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.6)', // darker overlay
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div className="config-modal-content" style={{
-            background: 'white',
-            padding: '30px',
-            borderRadius: '12px',
-            width: '550px',  // Increased from 520px for more horizontal space
-            maxHeight: '90vh',  // Increased from 85vh to 90vh for more vertical space
-            overflow: 'auto',  // Added scrolling if needed
-            boxShadow: '0 8px 24px rgba(0,0,0,0.2)', // Enhanced shadow
-            textAlign: 'center'
-          }}>
-            <h2 style={{ fontSize: '1.3rem', marginBottom: '20px' }}>Model Configuration</h2>
+        <div className="config-modal">
+          <div className="config-modal-content">
+            <div className="config-header">
+              <h2>Model Configuration</h2>
+              <p className="config-subtitle">Optimize transcription and summarization settings</p>
+            </div>
             
-            {/* Add a consistent container for all config options */}
             <div className="config-options">
-              {/* Model type selection */}
-              <div className="config-option">
-                <label>Model Type:</label>
+              <div className="config-option model-type">
+                <label>Model Engine</label>
                 <select 
                   value={modelType} 
                   onChange={(e) => {
                     setModelType(e.target.value);
-                    // Don't reset size if same model type or if there's a compatible size
                     if (e.target.value !== modelType) {
-                      setModelSize("tiny"); // Reset size only on model type change
+                      setModelSize("tiny");
                     }
                   }}
                 >
-                  <option value="whisper">Whisper</option>
-                  <option value="faster-whisper">Faster-Whisper</option>
+                  <option value="faster-whisper">Faster-Whisper (Optimized)</option>
+                  <option value="whisper">Whisper (Original)</option>
                 </select>
               </div>
 
-              {/* Model size selection */}
-              <div className="config-option">
-                <label>Model Size:</label>
+              <div className="config-option model-size">
+                <label>Model Size</label>
                 <select 
                   value={modelSize} 
                   onChange={(e) => setModelSize(e.target.value)}
                 >
                   {modelType === 'faster-whisper' ? (
                     <>
-                      <option value="tiny">tiny</option>
-                      <option value="base">base</option>
-                      <option value="small">small</option>
-                      <option value="medium">medium</option>
-                      <option value="large">large</option>
-                      <option value="turbo">turbo</option>
+                      <option value="turbo">Turbo (Fastest)</option>
+                      <option value="tiny">Tiny (Compact)</option>
+                      <option value="base">Base (Balanced)</option>
+                      <option value="small">Small (Improved)</option>
+                      <option value="medium">Medium (Enhanced)</option>
+                      <option value="large">Large (Best)</option>
                     </>
                   ) : (
                     <>
-                      <option value="tiny">tiny</option>
-                      <option value="base">base</option>
-                      <option value="small">small</option>
-                      <option value="medium">medium</option>
-                      <option value="turbo">turbo</option>
+                      <option value="turbo">Turbo (Fastest)</option>
+                      <option value="tiny">Tiny (Compact)</option>
+                      <option value="base">Base (Balanced)</option>
+                      <option value="small">Small (Improved)</option>
+                      <option value="medium">Medium (Enhanced)</option>
                     </>
                   )}
                 </select>
               </div>
 
-              {/* Language selection - MOVED FROM OUTSIDE THE MODAL */}
-              <div className="config-option">
-                <label>Language:</label>
+              <div className="config-option language-select">
+                <label>Language</label>
                 <select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
                   className={['hi', 'bn'].includes(language) ? 'specialized-language' : ''}
                 >
-                  <option value="">Auto Detect</option>
-                  <option value="en">English</option>
-                  <option value="hi" className="specialized-option">Hindi ★</option>
-                  <option value="bn" className="specialized-option">Bengali ★</option>
-                  <option value="es">Spanish</option>
-                  <option value="fr">French</option>
-                  <option value="de">German</option>
-                  <option value="ja">Japanese</option>
-                  <option value="zh">Chinese</option>
-                  <option value="ru">Russian</option>
+                  <option value="auto">Auto-Detect Language</option>
+                  <optgroup label="Specialized Support">
+                    <option value="hi" className="specialized-option">Hindi (Enhanced)</option>
+                    <option value="bn" className="specialized-option">Bengali (Enhanced)</option>
+                  </optgroup>
+                  <optgroup label="Common Languages">
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                  </optgroup>
+                  <optgroup label="Other Languages">
+                    <option value="it">Italian</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="nl">Dutch</option>
+                    <option value="pl">Polish</option>
+                    <option value="tr">Turkish</option>
+                  </optgroup>
                 </select>
               </div>
 
-              {/* Summarizer model selection */}
-              <div className="config-option">
-                <label>Summarizer:</label>
-                <select 
-                  value={summarizerModel} 
+              <div className="config-option summarizer-select">
+                <label>Summarizer</label>
+                <select
+                  value={summarizerModel}
                   onChange={(e) => setSummarizerModel(e.target.value)}
+                  className={['ai4bharat/IndicBART', 'google/mt5-base'].includes(summarizerModel) ? 'specialized-language' : ''}
                 >
-                  {Object.keys(availableSummarizers).map(key => (
-                    <option key={key} value={key} className={
-                      // Highlight specialized models for current language
-                      (language === 'hi' && availableSummarizers[key].languages?.includes('hi')) ||
-                      (language === 'bn' && availableSummarizers[key].languages?.includes('bn'))
-                        ? 'specialized-option'
-                        : ''
-                    }>
-                      {key.includes('/') ? key.split('/')[1] : key} 
-                      {availableSummarizers[key].languages?.includes(language) && ' ★'}
-                    </option>
-                  ))}
+                  <optgroup label="General Purpose">
+                    <option value="facebook/bart-large-cnn">BART Large CNN (Best Quality)</option>
+                    <option value="facebook/bart-large-xsum">BART XSum (Concise)</option>
+                    <option value="google/pegasus-xsum">Pegasus (Enhanced)</option>
+                  </optgroup>
+                  <optgroup label="Language Specialized">
+                    <option value="ai4bharat/IndicBART" className="specialized-option">IndicBART (Hindi Optimized)</option>
+                    <option value="google/mt5-base" className="specialized-option">MT5 Base (Bengali Optimized)</option>
+                  </optgroup>
+                  <optgroup label="Multilingual">
+                    <option value="facebook/mbart-large-50-one-to-many-mmt">mBART-50 (50 Languages)</option>
+                  </optgroup>
                 </select>
               </div>
-            </div>
 
-            {/* Summarizer model info */}
-            {availableSummarizers[summarizerModel] && (
-              <div className="model-info">
-                {availableSummarizers[summarizerModel].description}
-                {availableSummarizers[summarizerModel].languages?.includes(language) && (
-                  <div className="language-match">
-                    <span role="img" aria-label="Star">⭐</span> Optimized for {language === 'hi' ? 'Hindi' : 'Bengali'}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Keep the model info table */}
-            <div className="model-info-table">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Size</th>
-                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Params</th>
-                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Multi</th>
-                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>VRAM</th>
-                    <th style={{ borderBottom: '1px solid #ddd', padding: '4px' }}>Speed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={{ padding: '4px' }}>tiny</td>
-                    <td style={{ padding: '4px' }}>39M</td>
-                    <td style={{ padding: '4px' }}>tiny</td>
-                    <td style={{ padding: '4px' }}>~1GB</td>
-                    <td style={{ padding: '4px' }}>~10x</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '4px' }}>base</td>
-                    <td style={{ padding: '4px' }}>74M</td>
-                    <td style={{ padding: '4px' }}>base</td>
-                    <td style={{ padding: '4px' }}>~1GB</td>
-                    <td style={{ padding: '4px' }}>~7x</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '4px' }}>small</td>
-                    <td style={{ padding: '4px' }}>244M</td>
-                    <td style={{ padding: '4px' }}>small</td>
-                    <td style={{ padding: '4px' }}>~2GB</td>
-                    <td style={{ padding: '4px' }}>~4x</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '4px' }}>medium</td>
-                    <td style={{ padding: '4px' }}>769M</td>
-                    <td style={{ padding: '4px' }}>medium</td>
-                    <td style={{ padding: '4px' }}>~5GB</td>
-                    <td style={{ padding: '4px' }}>~2x</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '4px' }}>turbo</td>
-                    <td style={{ padding: '4px' }}>809M</td>
-                    <td style={{ padding: '4px' }}>turbo</td>
-                    <td style={{ padding: '4px' }}>~6GB</td>
-                    <td style={{ padding: '4px' }}>~8x</td>
-                  </tr>
-                  {modelType === 'faster-whisper' && (
+              <div className="model-info-table">
+                <table>
+                  <thead>
                     <tr>
-                      <td style={{ padding: '4px' }}>large</td>
-                      <td style={{ padding: '4px' }}>1550M</td>
-                      <td style={{ padding: '4px' }}>large-v3</td>
-                      <td style={{ padding: '4px' }}>~10GB</td>
-                      <td style={{ padding: '4px' }}>~1x</td>
+                      <th>Size</th>
+                      <th>Quality</th>
+                      <th>Speed</th>
+                      <th>Memory</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Turbo</td>
+                      <td>Good</td>
+                      <td>Fastest</td>
+                      <td>~1GB</td>
+                    </tr>
+                    <tr>
+                      <td>Tiny</td>
+                      <td>Basic</td>
+                      <td>Very Fast</td>
+                      <td>~1GB</td>
+                    </tr>
+                    <tr>
+                      <td>Base</td>
+                      <td>Good</td>
+                      <td>Fast</td>
+                      <td>~1GB</td>
+                    </tr>
+                    <tr>
+                      <td>Small</td>
+                      <td>Better</td>
+                      <td>Medium</td>
+                      <td>~2GB</td>
+                    </tr>
+                    <tr>
+                      <td>Medium</td>
+                      <td>Great</td>
+                      <td>Slower</td>
+                      <td>~5GB</td>
+                    </tr>
+                    {modelType === 'faster-whisper' && (
+                      <tr>
+                        <td>Large</td>
+                        <td>Best</td>
+                        <td>Slowest</td>
+                        <td>~10GB</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-              <button 
-                onClick={saveConfig}
-                className="config-save-button"
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#4f46e5',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem'
-                }}
-              >
-                Save Configuration
+
+            <div className="config-actions">
+              <button className="config-close-button" onClick={() => setShowConfig(false)}>
+                Cancel
               </button>
-              <button 
-                onClick={() => setShowConfig(false)}
-                className="config-close-button"
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem'
-                }}
-              >
-                Close
+              <button className="config-save-button" onClick={saveConfig}>
+                Apply Changes
               </button>
             </div>
           </div>

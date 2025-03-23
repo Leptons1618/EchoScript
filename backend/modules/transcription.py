@@ -70,13 +70,20 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium", lang
             last_log_time = time.time()
             
             # Process segments with optimization options and language
+            transcribe_kwargs = {
+                "beam_size": 5,
+                "task": "transcribe",
+                "vad_filter": True,
+                "vad_parameters": dict(min_silence_duration_ms=500),
+            }
+            
+            # Only add language parameter if it's not None or 'auto'
+            if language and language.lower() != 'auto':
+                transcribe_kwargs["language"] = language
+            
             for segment in faster_model.transcribe(
                 audio_path,
-                beam_size=5,
-                language=language,  # Add language parameter 
-                task="transcribe",
-                vad_filter=True,
-                vad_parameters=dict(min_silence_duration_ms=500),
+                **transcribe_kwargs
             )[0]:
                 segment_count += 1
                 segments.append(segment)
@@ -89,7 +96,7 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium", lang
                 # Report progress every 10 seconds
                 current_time = time.time()
                 if (current_time - last_log_time) > 10:
-                    progress = min(100, int((segment.end / audio_duration * 100) if audio_duration else 0))
+                    progress = min(500, int((segment.end / audio_duration * 100) if audio_duration else 0))
                     logger.info(f"Job {job_id}: Transcription progress ~{progress}% ({segment_count} segments)")
                     last_log_time = current_time
             
@@ -110,6 +117,10 @@ def transcribe_audio(audio_path, model_type="whisper", model_size="medium", lang
             errorMsg = "No Whisper model loaded. Please configure and load a model first."
             logger.error(errorMsg)
             raise Exception(errorMsg)
+        
+        # Validate and set default language if necessary
+        if not language or language.lower() == 'auto':
+            language = 'en'  # Default to English if no language is provided
         
         # Start transcription
         logger.info(f"Starting OpenAI Whisper transcription for job {job_id}")

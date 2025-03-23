@@ -38,14 +38,17 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-brand">
         <Link to="/" className="logo">
-          YT Transcriber
+          Echo<span className="logo-accent">Script</span>
         </Link>
       </div>
       <div className="navbar-menu">
-        <Link to="/" className="navbar-item">Home</Link>
-        <Link to="/jobs" className="navbar-item">My Transcriptions</Link>
-        {/* Replace emoji with icons */}
-        <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">
+        <Link to="/" className="navbar-item">Dashboard</Link>
+        <Link to="/jobs" className="navbar-item">Library</Link>
+        <button 
+          className="theme-toggle" 
+          onClick={toggleTheme} 
+          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+        >
           {theme === 'light' ? <FiMoon /> : <FiSun />}
         </button>
       </div>

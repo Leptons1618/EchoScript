@@ -1,6 +1,10 @@
 import os
 from notion_client import Client
+from dotenv import load_dotenv
 from config import logger
+
+# Load environment variables from .env file
+load_dotenv()
 
 def sanitize_text(text):
     """Sanitize text to handle Unicode characters safely
@@ -142,13 +146,14 @@ def export_to_notion(content, notion_token=None, parent_page_id=None):
         dict: Result of operation with success status and page URL
     """
     try:
-        # Get API key either from parameter or environment variable
+        # Try to get API key from parameter first, then environment variable
         notion_token = notion_token or os.getenv('NOTION_API_KEY')
         
-        # Get parent page ID either from parameter or environment variable
+        # Try to get parent page ID from parameter first, then environment variable
         parent_page_id = parent_page_id or os.getenv('NOTION_PARENT_PAGE_ID')
         
         if not notion_token or not parent_page_id or not content:
+            logger.error("Missing Notion credentials - Token or Page ID not found in parameters or environment variables")
             return {
                 'success': False,
                 'error': 'Missing required parameters. Please provide Notion token and page ID or set them in environment variables.'

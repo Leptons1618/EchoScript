@@ -115,7 +115,7 @@ def get_config():
     # Add language support information
     config_data["language_support"] = {
         # Standard models support all languages but at varying quality
-        "standard_summarizers": ["bart-large-cnn", "facebook/bart-large-xsum", "google/pegasus-xsum"],
+        "standard_summarizers": ["facebook/bart-large-cnn", "facebook/bart-large-xsum", "google/pegasus-xsum"],
         # Specialized models for specific languages
         "specialized_summarizers": {
             "hi": ["ai4bharat/IndicBART"],
