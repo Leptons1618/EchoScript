@@ -1,12 +1,15 @@
 // src/components/Navbar.js
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './Navbar.css';
 // Import sun and moon icons
-import { FiSun, FiMoon } from 'react-icons/fi';
+import { FiSun, FiMoon, FiLogOut, FiUser } from 'react-icons/fi';
+import { useAuth } from '../contexts/AuthContext';
 
 const Navbar = () => {
   const [theme, setTheme] = useState('light');
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   
   // Load theme from config when component mounts
   useEffect(() => {
@@ -33,6 +36,11 @@ const Navbar = () => {
       body: JSON.stringify({ theme: newTheme })
     }).catch(err => console.error("Error saving theme:", err));
   };
+  
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <nav className="navbar">
@@ -42,8 +50,27 @@ const Navbar = () => {
         </Link>
       </div>
       <div className="navbar-menu">
-        <Link to="/" className="navbar-item">Dashboard</Link>
-        <Link to="/jobs" className="navbar-item">Library</Link>
+        {isAuthenticated ? (
+          <>
+            <Link to="/" className="navbar-item">Dashboard</Link>
+            <Link to="/jobs" className="navbar-item">Library</Link>
+            <div className="user-menu">
+              <span className="username">
+                <FiUser className="user-icon" />
+                {user?.username}
+              </span>
+              <button 
+                className="logout-button" 
+                onClick={handleLogout}
+                title="Logout"
+              >
+                <FiLogOut />
+              </button>
+            </div>
+          </>
+        ) : (
+          <Link to="/login" className="navbar-item">Login</Link>
+        )}
         <button 
           className="theme-toggle" 
           onClick={toggleTheme} 

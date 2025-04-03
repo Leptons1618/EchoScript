@@ -11,6 +11,9 @@ import uuid
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import nltk
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_bcrypt import Bcrypt
+from flask_session import Session
 
 # Import modules
 from config import logger, active_jobs, transcription_logs, CONFIG_FILE
@@ -19,13 +22,47 @@ from modules.transcription import process_video
 from modules.models import load_whisper_model, verify_faster_whisper_model, load_summarizer, save_app_config, load_app_config
 from modules.notion import export_to_notion
 from modules.summarization import generate_notes
+from models import User
 
 # Ensure required NLTK resources are available
 ensure_nltk_resources()
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='../frontend/build')
-CORS(app)
+CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
+
+# Add configurations for authentication and session management
+app.secret_key = 'your_secret_key_here'  # Change this to a secure random string
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours in seconds
+
+# Initialize extensions
+bcrypt = Bcrypt(app)
+Session(app)
+login_manager = LoginManager(app)
+login_manager.login_view = '/login'  # Route to redirect to when login is required
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(user_id)
+
+# Create default admin user if no users exist
+def create_default_admin():
+    if not User.get_all_users():
+        admin_password = bcrypt.generate_password_hash('admin123').decode('utf-8')
+        admin = User(
+            id=str(uuid.uuid4()),
+            username='admin',
+            password_hash=admin_password,
+            email='admin@example.com',
+            is_admin=True
+        )
+        User.save_user(admin)
+        print("Default admin user created!")
+
+# Call this function after app initialization
+create_default_admin()
 
 # Remove the automatic model loading at startup
 # def initialize_models():
@@ -40,8 +77,10 @@ logger.info("Loading application configuration")
 app_config = load_app_config()
 logger.info(f"Configuration loaded: {app_config}")
 
+# Example of protecting a route
 @app.route('/api/transcribe', methods=['POST'])
-def transcribe_video():
+# @login_required
+def transcribe():
     """API endpoint to start transcription of a YouTube video"""
     try:
         data = request.json
@@ -353,6 +392,86 @@ def regenerate_notes(job_id):
     except Exception as e:
         logger.error(f"Error regenerating notes: {str(e)}", exc_info=True)
         return jsonify({"error": f"Failed to regenerate notes: {str(e)}"}), 500
+
+# Authentication routes
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    user = User.get_by_username(username)
+    if user and bcrypt.check_password_hash(user.password_hash, password):
+        login_user(user)
+        return jsonify({
+            'success': True, 
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'is_admin': user.is_admin
+            }
+        })
+    
+    return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
+
+@app.route('/api/auth/signup', methods=['POST'])
+def signup():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    email = data.get('email')
+    
+    # Validate inputs
+    if not (username and password and email):
+        return jsonify({'success': False, 'message': 'All fields are required'}), 400
+        
+    # Check if user already exists
+    if User.get_by_username(username):
+        return jsonify({'success': False, 'message': 'Username already exists'}), 400
+        
+    if User.get_by_email(email):
+        return jsonify({'success': False, 'message': 'Email already exists'}), 400
+    
+    # Create new user
+    password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+    new_user = User(
+        id=str(uuid.uuid4()),
+        username=username,
+        password_hash=password_hash,
+        email=email
+    )
+    User.save_user(new_user)
+    login_user(new_user)
+    
+    return jsonify({
+        'success': True, 
+        'user': {
+            'id': new_user.id,
+            'username': new_user.username,
+            'email': new_user.email
+        }
+    })
+
+@app.route('/api/auth/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'success': True})
+
+@app.route('/api/auth/check', methods=['GET'])
+def check_auth():
+    if current_user.is_authenticated:
+        return jsonify({
+            'authenticated': True,
+            'user': {
+                'id': current_user.id,
+                'username': current_user.username,
+                'email': current_user.email,
+                'is_admin': getattr(current_user, 'is_admin', False)
+            }
+        })
+    return jsonify({'authenticated': False})
 
 # Serve React frontend in production
 @app.route('/', defaults={'path': ''})
