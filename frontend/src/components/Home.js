@@ -6,41 +6,87 @@ import { FiSettings } from 'react-icons/fi';
 import { FaFileAlt, FaChartBar, FaClock, FaSave } from 'react-icons/fa';
 
 const Home = () => {
+  // Add a function to safely handle localStorage operations
+  const getStoredConfig = () => {
+    try {
+      const storedConfig = localStorage.getItem('modelConfig');
+      if (storedConfig) {
+        return JSON.parse(storedConfig);
+      }
+    } catch (error) {
+      console.error("Error reading from localStorage:", error);
+    }
+    return {};
+  };
+
+  const saveToStorage = (config) => {
+    try {
+      localStorage.setItem('modelConfig', JSON.stringify(config));
+      console.log("Configuration saved to localStorage:", config);
+    } catch (error) {
+      console.error("Error saving to localStorage:", error);
+    }
+  };
+
+  // Get saved config immediately for initial state values
+  const savedConfig = getStoredConfig();
+  
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  // State for configuration modal and selections
+  // State for configuration modal and selections - initialize from localStorage
   const [showConfig, setShowConfig] = useState(false);
-  const [modelType, setModelType] = useState('whisper');
-  const [modelSize, setModelSize] = useState('medium');
-  // Set status initially to "no model loaded"
-  const [modelLoadStatus, setModelLoadStatus] = useState("no model loaded");
-  // Add new state for summarizer model
-  const [summarizerModel, setSummarizerModel] = useState('bart-large-cnn');
+  const [modelType, setModelType] = useState(savedConfig.modelType || 'whisper');
+  const [modelSize, setModelSize] = useState(savedConfig.modelSize || 'medium');
+  const [modelLoadStatus, setModelLoadStatus] = useState(savedConfig.modelLoadStatus || "no model loaded");
+  const [summarizerModel, setSummarizerModel] = useState(savedConfig.summarizerModel || 'bart-large-cnn');
   const [availableSummarizers, setAvailableSummarizers] = useState({});
-  const [summarizerStatus, setSummarizerStatus] = useState("no summarizer loaded");
-  const [language, setLanguage] = useState(''); // '' means auto-detect
+  const [summarizerStatus, setSummarizerStatus] = useState(savedConfig.summarizerStatus || "no summarizer loaded");
+  const [language, setLanguage] = useState(savedConfig.language || ''); // '' means auto-detect
 
-  // Enhanced useEffect to fetch model status and configuration on startup
+  // Now just fetch from server to ensure we have the latest data
   useEffect(() => {
+    // First apply any saved settings from localStorage to the state
+    const savedConfig = getStoredConfig();
+    if (savedConfig.modelType) setModelType(savedConfig.modelType);
+    if (savedConfig.modelSize) setModelSize(savedConfig.modelSize);
+    if (savedConfig.modelLoadStatus) setModelLoadStatus(savedConfig.modelLoadStatus);
+    if (savedConfig.summarizerModel) setSummarizerModel(savedConfig.summarizerModel);
+    if (savedConfig.summarizerStatus) setSummarizerStatus(savedConfig.summarizerStatus);
+    if (savedConfig.language) setLanguage(savedConfig.language);
+    
+    // Then fetch from server
     fetch('http://localhost:5000/api/config')
       .then(res => res.json())
       .then(data => {
-        // Update model status
-        setModelLoadStatus(data.model_status || "no model loaded");
-        setSummarizerStatus(data.summarizer_status || "no summarizer loaded");
+        // Update model status - PRESERVE LOADED STATUS from localStorage
+        // Only update if server explicitly says the model is loaded or not loaded
+        const updatedModelStatus = data.model_status === "loaded" || data.model_status === "loading" 
+          ? data.model_status 
+          : (savedConfig.modelLoadStatus === "loaded" ? "loaded" : data.model_status || modelLoadStatus);
+          
+        const updatedSummarizerStatus = data.summarizer_status === "loaded" || data.summarizer_status === "loading"
+          ? data.summarizer_status
+          : (savedConfig.summarizerStatus === "loaded" ? "loaded" : data.summarizer_status || summarizerStatus);
+        
+        setModelLoadStatus(updatedModelStatus);
+        setSummarizerStatus(updatedSummarizerStatus);
         
         // Update model type and size from server configuration
+        const updatedModelType = data.model_type || modelType;
+        const updatedModelSize = data.model_size || modelSize;
+        const updatedSummarizerModel = data.summarizer_model || summarizerModel;
+        
         if (data.model_type) {
-          setModelType(data.model_type);
+          setModelType(updatedModelType);
         }
         if (data.model_size) {
-          setModelSize(data.model_size);
+          setModelSize(updatedModelSize);
         }
         if (data.summarizer_model) {
-          setSummarizerModel(data.summarizer_model);
+          setSummarizerModel(updatedSummarizerModel);
         }
         
         // Store available summarizers
@@ -48,10 +94,41 @@ const Home = () => {
           setAvailableSummarizers(data.available_summarizers);
         }
         
-        console.log("Loaded model configuration:", data.model_type, data.model_size, data.summarizer_model);
+        // Save this configuration to localStorage
+        const configToSave = {
+          modelType: updatedModelType,
+          modelSize: updatedModelSize,
+          summarizerModel: updatedSummarizerModel,
+          modelLoadStatus: updatedModelStatus, // Use the preserved status
+          summarizerStatus: updatedSummarizerStatus, // Use the preserved status
+          language: savedConfig.language || language
+        };
+        
+        saveToStorage(configToSave);
+        
+        console.log("Loaded model configuration:", updatedModelType, updatedModelSize, updatedSummarizerModel);
       })
-      .catch(err => console.error("Error loading configuration:", err));
+      .catch(err => {
+        console.error("Error loading configuration:", err);
+        // On error, maintain the localStorage settings
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Create a separate effect to update localStorage when model settings change
+  useEffect(() => {
+    const config = getStoredConfig();
+    const updatedConfig = {
+      ...config,
+      modelType,
+      modelSize,
+      summarizerModel,
+      modelLoadStatus,
+      summarizerStatus,
+      language
+    };
+    saveToStorage(updatedConfig);
+  }, [modelType, modelSize, summarizerModel, modelLoadStatus, summarizerStatus, language]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -122,8 +199,16 @@ const Home = () => {
     }
   }, [language, availableSummarizers]);
 
-  // Updated saveConfig function: close popup immediately, show loading animation,
-  // then update status to loaded on success.
+  // Add an effect to update localStorage when language changes
+  useEffect(() => {
+    // Get current config from localStorage
+    const savedConfig = getStoredConfig();
+    // Update language and save back
+    savedConfig.language = language;
+    saveToStorage(savedConfig);
+  }, [language]);
+
+  // Updated saveConfig function to also save to localStorage
   const saveConfig = async () => {
     setShowConfig(false);
     setModelLoadStatus("loading");
@@ -142,6 +227,16 @@ const Home = () => {
         console.log(data.message);
         setModelLoadStatus("loaded");
         setSummarizerStatus("loaded");
+        
+        // Save updated configuration to localStorage
+        saveToStorage({
+          modelType,
+          modelSize,
+          summarizerModel,
+          modelLoadStatus: "loaded",
+          summarizerStatus: "loaded",
+          language
+        });
       } else {
         alert('Failed to load the model configuration: ' + data.error);
       }
