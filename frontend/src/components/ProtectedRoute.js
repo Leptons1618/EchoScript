@@ -6,21 +6,22 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
   
+  // Show nothing while checking authentication status
   if (loading) {
-    // Show loading indicator while checking authentication
     return (
-      <div className="loading-screen">
+      <div className="loading-container">
         <div className="spinner"></div>
-        <p>Loading...</p>
+        <p>Authenticating...</p>
       </div>
     );
   }
   
+  // Redirect to login if not authenticated, preserving the intended destination
   if (!isAuthenticated) {
-    // Redirect to login with the path they tried to visit
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
+  // If authenticated, render the children
   return children;
 };
 

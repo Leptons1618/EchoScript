@@ -1,25 +1,342 @@
-/* // src/App.css */
+/* Base Theme Variables */
+:root {
+  /* Primary colors */
+  --color-primary: #4361ee;
+  --color-primary-hover: #3a56d4;
+  --color-secondary: #4cc9f0;
+  --color-accent: #7209b7;
+  
+  /* Neutral colors */
+  --color-background: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-text: #212529;
+  --color-text-secondary: #6c757d;
+  --color-border: #e9ecef;
+  
+  /* Status colors */
+  --color-success: #40916c;
+  --color-warning: #ffaa00;
+  --color-error: #e63946;
+  --color-info: #4361ee;
+  
+  /* Status text styling */
+  --status-text-queued-bg: rgba(255, 170, 0, 0.15);
+  --status-text-queued-color: #b86e00;
+  --status-text-queued-border: rgba(255, 170, 0, 0.5);
+  
+  --status-text-processing-bg: rgba(67, 97, 238, 0.15);
+  --status-text-processing-color: #3252d3;
+  --status-text-processing-border: rgba(67, 97, 238, 0.5);
+  
+  --status-text-complete-bg: rgba(64, 145, 108, 0.15);
+  --status-text-complete-color: #307a55;
+  --status-text-complete-border: rgba(64, 145, 108, 0.5);
+  
+  --status-text-error-bg: rgba(230, 57, 70, 0.15);
+  --status-text-error-color: #d32f3d;
+  --status-text-error-border: rgba(230, 57, 70, 0.5);
+  
+  /* Layout */
+  --navbar-height: 60px;
+  --footer-height: 40px;
+  --border-radius: 8px;
+  --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  
+  /* Animations */
+  --transition-speed: 0.2s;
+}
+
+/* Dark theme overrides */
+body.dark {
+  /* Primary colors */
+  --color-primary: #4895ef;
+  --color-primary-hover: #3187e1;
+  --color-secondary: #3fc1f0;
+  --color-accent: #9d4edd;
+  
+  /* Neutral colors */
+  --color-background: #121212;
+  --color-surface: #1e1e1e;
+  --color-text: #e0e0e0;
+  --color-text-secondary: #a0a0a0;
+  --color-border: #303030;
+  
+  /* Status colors */
+  --color-success: #52b788;
+  --color-warning: #ffb700;
+  --color-error: #f25c5c;
+  --color-info: #4895ef;
+  
+  /* Status text styling for dark theme */
+  --status-text-queued-bg: rgba(255, 183, 0, 0.2);
+  --status-text-queued-color: #ffcb47;
+  --status-text-queued-border: rgba(255, 183, 0, 0.4);
+  
+  --status-text-processing-bg: rgba(72, 149, 239, 0.2);
+  --status-text-processing-color: #6faaf0;
+  --status-text-processing-border: rgba(72, 149, 239, 0.4);
+  
+  --status-text-complete-bg: rgba(82, 183, 136, 0.2);
+  --status-text-complete-color: #6fc599;
+  --status-text-complete-border: rgba(82, 183, 136, 0.4);
+  
+  --status-text-error-bg: rgba(242, 92, 92, 0.2);
+  --status-text-error-color: #f47c7c;
+  --status-text-error-border: rgba(242, 92, 92, 0.4);
+}
+
+/* Global styles */
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-bg);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  background-color: var(--color-background);
   color: var(--color-text);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  margin: 0;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
 }
 
 .app-container {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
 }
 
 .main-content {
   flex: 1;
-  margin: 0 auto;
+  padding: 1.5rem;
   max-width: 1200px;
+  margin: 0 auto;
   width: 100%;
-  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Enhanced Status Text Styling */
+.status-text {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: all var(--transition-speed) ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+/* Status-specific styles */
+.status-text.queued {
+  background-color: var(--status-text-queued-bg);
+  color: var(--status-text-queued-color);
+  border: 1px solid var(--status-text-queued-border);
+}
+
+.status-text.processing {
+  background-color: var(--status-text-processing-bg);
+  color: var(--status-text-processing-color);
+  border: 1px solid var(--status-text-processing-border);
+}
+
+.status-text.complete {
+  background-color: var(--status-text-complete-bg);
+  color: var(--status-text-complete-color);
+  border: 1px solid var(--status-text-complete-border);
+}
+
+.status-text.error {
+  background-color: var(--status-text-error-bg);
+  color: var(--status-text-error-color);
+  border: 1px solid var(--status-text-error-border);
+}
+
+/* Add status icon before text */
+.status-text::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-text.queued::before {
+  background-color: var(--status-text-queued-color);
+}
+
+.status-text.processing::before {
+  background-color: var(--status-text-processing-color);
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.status-text.complete::before {
+  background-color: var(--status-text-complete-color);
+}
+
+.status-text.error::before {
+  background-color: var(--status-text-error-color);
+}
+
+/* Pulse animation for processing status */
+@keyframes pulse {
+  0% { opacity: 0.6; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0.6; transform: scale(0.75); }
+}
+
+/* Enhanced form styles */
+.form-control {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: all var(--transition-speed) ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.3);
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+/* Button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  font-size: 1rem;
+  font-weight: 500;
+  border-radius: var(--border-radius);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.btn:hover {
+  background-color: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+}
+
+.btn-accent {
+  background-color: var(--color-accent);
+}
+
+/* Card styles */
+.card {
+  background-color: var(--color-surface);
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  overflow: hidden;
+  transition: all var(--transition-speed) ease;
+}
+
+.card-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.card-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Table styles */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+th, td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+th {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+body.dark tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Loading animation */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(var(--color-primary), 0.3);
+  border-radius: 50%;
+  border-top-color: var(--color-primary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Alert styles */
+.alert {
+  padding: 12px 16px;
+  margin-bottom: 1rem;
+  border-radius: var(--border-radius);
+  border-left: 4px solid var(--color-info);
+  background-color: rgba(67, 97, 238, 0.1);
+}
+
+.alert-success {
+  border-left-color: var(--color-success);
+  background-color: rgba(64, 145, 108, 0.1);
+}
+
+.alert-warning {
+  border-left-color: var(--color-warning);
+  background-color: rgba(255, 170, 0, 0.1);
+}
+
+.alert-error {
+  border-left-color: var(--color-error);
+  background-color: rgba(230, 57, 70, 0.1);
 }

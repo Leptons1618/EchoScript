@@ -296,6 +296,31 @@ const Home = () => {
     return pattern.test(url.trim());
   };
 
+  // Enhanced status rendering function - same as in JobsList for consistency
+  const renderStatus = (status) => {
+    const statusClass = `status-text ${status.toLowerCase()}`;
+    let statusText;
+    
+    switch(status.toLowerCase()) {
+      case 'queued':
+        statusText = 'In Queue';
+        break;
+      case 'processing':
+        statusText = 'Processing';
+        break;
+      case 'complete':
+        statusText = 'Completed';
+        break;
+      case 'error':
+        statusText = 'Failed';
+        break;
+      default:
+        statusText = status;
+    }
+    
+    return <span className={statusClass}>{statusText}</span>;
+  };
+
   return (
     <div className="home-container">
       <div className="hero-section">

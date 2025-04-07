@@ -6,9 +6,11 @@ import os
 import threading
 import time
 import uuid
+import functools
+from datetime import datetime
 
 # Third-Party Libraries
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, make_response, g, redirect, url_for
 from flask_cors import CORS
 import nltk
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -76,6 +78,48 @@ create_default_admin()
 logger.info("Loading application configuration")
 app_config = load_app_config()
 logger.info(f"Configuration loaded: {app_config}")
+
+# Add a request logger middleware to track user experience
+@app.before_request
+def log_request_info():
+    g.start_time = time.time()
+    logger.debug(f"Request: {request.method} {request.path} from {request.remote_addr}")
+
+@app.after_request
+def log_response_info(response):
+    if hasattr(g, 'start_time'):
+        duration = time.time() - g.start_time
+        logger.debug(f"Response: {response.status_code}, took {duration:.4f}s")
+    return response
+
+# Add consistent API error handler
+@app.errorhandler(404)
+def not_found(error):
+    return make_response(jsonify({
+        'success': False,
+        'error': 'Resource not found',
+        'message': 'The requested resource could not be found on this server'
+    }), 404)
+
+@app.errorhandler(500)
+def server_error(error):
+    return make_response(jsonify({
+        'success': False,
+        'error': 'Server error',
+        'message': 'An unexpected error occurred'
+    }), 500)
+
+# Helper function to get user preferences
+def get_user_preferences():
+    config_data = load_app_config()
+    return {
+        'theme': config_data.get('theme', 'light'),
+        'model_preferences': {
+            'model_type': config_data.get('model_type', 'whisper'),
+            'model_size': config_data.get('model_size', 'medium'),
+            'summarizer_model': config_data.get('summarizer_model')
+        }
+    }
 
 # Example of protecting a route
 @app.route('/api/transcribe', methods=['POST'])
@@ -459,28 +503,83 @@ def logout():
     logout_user()
     return jsonify({'success': True})
 
+# Enhanced authentication check with more user data
 @app.route('/api/auth/check', methods=['GET'])
 def check_auth():
     if current_user.is_authenticated:
+        # Get last login time from user if available
+        last_login = getattr(current_user, 'last_login', datetime.now().isoformat())
+        
+        # Get user preferences
+        preferences = get_user_preferences()
+        
+        # Get active jobs count for this user
+        user_jobs = [job for job_id, job in active_jobs.items() 
+                    if job.get('user_id') == current_user.id]
+        
         return jsonify({
             'authenticated': True,
             'user': {
                 'id': current_user.id,
                 'username': current_user.username,
                 'email': current_user.email,
-                'is_admin': getattr(current_user, 'is_admin', False)
-            }
+                'is_admin': getattr(current_user, 'is_admin', False),
+                'last_login': last_login,
+                'active_jobs_count': len(user_jobs)
+            },
+            'preferences': preferences,
+            'session_expires_in': app.permanent_session_lifetime.total_seconds()
         })
-    return jsonify({'authenticated': False})
+    
+    return jsonify({
+        'authenticated': False,
+        'message': 'Authentication required',
+        'default_theme': load_app_config().get('theme', 'light')
+    })
 
-# Serve React frontend in production
+# Add a clear model config endpoint for better user control
+@app.route('/api/clear_model_config', methods=['POST'])
+def clear_model_config():
+    try:
+        # Reset to default config but keep theme
+        current_theme = load_app_config().get('theme', 'light')
+        save_app_config('whisper', 'medium', None, current_theme)
+        return jsonify({
+            'success': True,
+            'message': 'Model configuration reset to defaults'
+        })
+    except Exception as e:
+        logger.error(f"Error clearing model config: {str(e)}")
+        return jsonify({
+            'success': False, 
+            'error': str(e),
+            'message': 'Failed to reset model configuration'
+        }), 500
+
+# Improved route for serving React frontend
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
+    # Special case for favicon
+    if path == 'favicon.ico':
+        return send_from_directory(os.path.join(app.static_folder, 'static'), 'favicon.ico')
+    
+    # Try to serve the specific file
     if path and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
+    
+    # For API calls that somehow ended up here, return proper JSON error
+    if path.startswith('api/'):
+        return jsonify({
+            'success': False,
+            'error': 'API endpoint not found',
+            'message': f'The API endpoint /{path} does not exist'
+        }), 404
+    
+    # For all other paths, serve the React app and let it handle routing
     return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
     logger.info("Starting Flask server on 0.0.0.0:5000")
-    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
+    # Use threaded=True to handle concurrent requests better
+    app.run(debug=True, use_reloader=True, host='0.0.0.0', port=5000, threaded=True)

@@ -1,10 +1,12 @@
 .auth-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background-color: var(--color-bg);
+  max-width: 450px;
+  margin: 2rem auto;
+  padding: 2.5rem;
+  border-radius: var(--border-radius);
+  background-color: var(--color-surface);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all var(--transition-speed) ease;
+  animation: fadeIn 0.4s ease-out;
 }
 
 .auth-card {
@@ -34,8 +36,12 @@
   font-size: 14px;
 }
 
+.auth-form {
+  margin-bottom: 1.5rem;
+}
+
 .auth-form .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem;
 }
 
 .auth-form label {
@@ -60,6 +66,92 @@
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+}
+
+.auth-form .form-control {
+  background-color: var(--color-background);
+}
+
+.auth-form .btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.auth-form .error-message {
+  color: var(--color-error);
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.auth-form .error-message svg {
+  margin-right: 0.25rem;
+}
+
+.auth-form .input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-form .input-icon {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.auth-form .input-with-icon {
+  padding-left: 45px;
+}
+
+.auth-form .password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-form .password-toggle:hover {
+  color: var(--color-primary);
+}
+
+.auth-separator {
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0;
+  color: var(--color-text-secondary);
+}
+
+.auth-separator::before,
+.auth-separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.auth-separator span {
+  padding: 0 10px;
+  font-size: 0.875rem;
 }
 
 .auth-button {
@@ -98,4 +190,236 @@
 
 .auth-links a:hover {
   text-decoration: underline;
+}
+
+.auth-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.auth-header h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+}
+
+.auth-header p {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.auth-link {
+  font-size: 0.9rem;
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.auth-link a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-speed) ease;
+}
+
+.auth-link a:hover {
+  text-decoration: underline;
+  color: var(--color-primary-hover);
+}
+
+/* Loading animation specific to login/signup form */
+.auth-form .form-loading {
+  position: relative;
+  width: 100%;
+}
+
+.auth-form .form-loading .spinner {
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+}
+
+.auth-form .form-loading .btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--color-primary-hover);
+  opacity: 0.9;
+  cursor: progress;
+}
+
+/* Fix for loading button alignment */
+.form-loading {
+  width: 100%;
+}
+
+.form-loading .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  background-color: var(--color-primary-hover);
+  opacity: 0.9;
+  cursor: progress;
+}
+
+.spinner {
+  display: inline-block;
+  margin-right: 8px;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* General button styling to ensure consistency */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Password visibility toggle */
+.password-toggle {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+/* Animation for form appearance */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Checkbox alignment */
+.checkbox-container {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-container input[type="checkbox"] {
+  margin-right: 0;
+  position: relative;
+  top: -1px;
+}
+
+.checkbox-container span {
+  margin-left: 8px;
+  font-size: 0.9rem;
+}
+
+/* Updated styling for remember me and forgot password */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+}
+
+.remember-me input[type="checkbox"] {
+  margin-right: 6px;
+  position: relative;
+  top: -1px;
+}
+
+.forgot-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-speed) ease;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+  color: var(--color-primary-hover);
+}
+
+/* Fixed styling for remember me checkbox and forgot password */
+.remember-me-container {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.remember-me-container input[type="checkbox"] {
+  margin: 0;
+  margin-right: 6px;
+}
+
+.remember-me-container label {
+  display: inline;
+  margin: 0;
+  user-select: none;
+  cursor: pointer;
+}
+
+.forgot-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+  color: var(--color-primary-hover);
+}
+
+/* Simplified loading button style */
+.btn-loading {
+  background-color: var(--color-primary-hover) !important;
+  opacity: 0.9;
+  cursor: progress;
+  text-align: center;
+}
+
+/* Ensure consistent button styling */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px 16px;
+  font-weight: 500;
+  border-radius: var(--border-radius);
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+}
+
+/* Improved loading button style with spinner */
+.btn-loading {
+  background-color: var(--color-primary-hover) !important;
+  opacity: 0.9;
+  cursor: progress;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px; /* Creates consistent spacing between icon and text */
+}
+
+.btn-spinner {
+  animation: spin 1s linear infinite;
+  font-size: 18px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

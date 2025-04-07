@@ -111,6 +111,31 @@ const JobsList = () => {
       resetFilters();
     }
   };
+
+  // Enhanced status rendering function
+  const renderStatus = (status) => {
+    const statusClass = `status-text ${status.toLowerCase()}`;
+    let statusText;
+    
+    switch(status.toLowerCase()) {
+      case 'queued':
+        statusText = 'In Queue';
+        break;
+      case 'processing':
+        statusText = 'Processing';
+        break;
+      case 'complete':
+        statusText = 'Completed';
+        break;
+      case 'error':
+        statusText = 'Failed';
+        break;
+      default:
+        statusText = status;
+    }
+    
+    return <span className={statusClass}>{statusText}</span>;
+  };
   
   if (isLoading) {
     return (
@@ -233,8 +258,7 @@ const JobsList = () => {
             <Link to={`/view/${job.job_id}`} key={job.job_id} className="job-card">
               <div className="job-status">
                 <span className={`status-indicator ${job.status}`}></span>
-                {job.status === 'complete' ? 'Completed' : 
-                 job.status === 'error' ? 'Failed' : 'Processing'}
+                {renderStatus(job.status)}
               </div>
               <h3 className="job-title">{job.title || 'Unknown Video'}</h3>
               <div className="job-created">{formatDate(job.created_at)}</div>

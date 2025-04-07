@@ -1,0 +1,62 @@
+/* Import login styles as a base */
+@import './Login.css';
+
+/* Additional styles for the signup form */
+.auth-form .requirement {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.3rem;
+  display: flex;
+  align-items: center;
+}
+
+.auth-form .requirement.valid {
+  color: var(--color-success);
+}
+
+.auth-form .requirement.invalid {
+  color: var(--color-error);
+}
+
+.auth-form .requirement svg {
+  margin-right: 4px;
+  font-size: 0.75rem;
+}
+
+.auth-form .input-feedback {
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
+  margin-left: 0.3rem;
+  display: flex;
+  align-items: center;
+}
+
+.auth-form .strength-meter {
+  width: 100%;
+  height: 4px;
+  background-color: var(--color-border);
+  margin-top: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.auth-form .strength-meter-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+.auth-form .strength-meter-bar.weak {
+  width: 33.33%;
+  background-color: var(--color-error);
+}
+
+.auth-form .strength-meter-bar.medium {
+  width: 66.66%;
+  background-color: var(--color-warning);
+}
+
+.auth-form .strength-meter-bar.strong {
+  width: 100%;
+  background-color: var(--color-success);
+}
