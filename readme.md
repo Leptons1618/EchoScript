@@ -1,33 +1,58 @@
-# YouTube Video Transcriber - Documentation
+# YouTube Video Transcriber
 
-A full-featured YouTube video transcription application with AI-powered notes and summaries.
+A full-featured application that transcribes YouTube videos, generates AI-powered notes, and provides synchronized video playback with interactive transcripts. Built with Python, Flask, and React.
 
 ## Features
 
+### Transcription & Analysis
 - **Transcription of YouTube videos** using OpenAI's Whisper or Faster-Whisper
 - **Synchronized video and transcript** - click on text to jump to that point in the video
-- **AI-generated smart notes and summaries**
+- **AI-generated smart notes and summaries** with customizable formatting
+
+### User Experience
 - **Advanced search capabilities**:
   - Full-text search within transcripts
   - Keyboard shortcuts (Enter to search, F3/Shift+F3 to navigate results, Esc to clear)
-  - Result highlighting
+  - Result highlighting and navigation
 - **Filtering and organization**:
   - Filter by status, date range
   - Sort alphabetically or by date
-  - Search by title
-- **Real-time transcription feedback** with animated updates
-- **Multiple export formats** (PDF, TXT)
+  - Search by title or content
+- **Multiple export formats** (PDF, TXT, Notion)
 - **Responsive design** with dark/light mode support
-- **Persistent theme settings**
+- **Persistent theme settings** that remember your preferences
+
+### Technical Features
+- **Real-time transcription feedback** with animated progress updates
 - **Detailed model configuration** with size/performance options
 - **Job history and status tracking**
+- **Notion integration** for seamless export of transcripts and notes
+
+## Quick Start
+
+For development, you can use the included start script:
+
+```bash
+# On Linux/Mac
+./start-dev.sh
+
+# With verbose output
+./start-dev.sh --verbose
+```
+
+This script automatically:
+- Checks for required dependencies
+- Sets up virtual environment if needed
+- Starts the Flask backend server
+- Launches the React frontend
+- Handles clean shutdown of services
 
 ## Prerequisites
 
-- Python 3.8+ with pip
-- Node.js 14+ with npm
-- ffmpeg (required for audio processing)
-- CUDA-compatible GPU recommended for faster processing
+- **Python 3.8+** with pip
+- **Node.js 14+** with npm
+- **ffmpeg** (required for audio processing)
+- **CUDA-compatible GPU** recommended for faster processing (optional but highly recommended for medium/large models)
 
 ## Backend Setup
 
@@ -48,7 +73,7 @@ source venv/bin/activate
 2. Install the dependencies:
 
 ```bash
-pip install flask flask-cors whisper faster-whisper yt-dlp transformers nltk torch
+pip install flask flask-cors whisper faster-whisper yt-dlp transformers nltk torch notion-client
 ```
 
 3. Install ffmpeg (if not already installed):
@@ -62,7 +87,7 @@ pip install flask flask-cors whisper faster-whisper yt-dlp transformers nltk tor
 1. Create a new React application:
 
 ```bash
-cd ..
+cd .. 
 npx create-react-app frontend
 cd frontend
 ```
@@ -70,12 +95,72 @@ cd frontend
 2. Install additional dependencies:
 
 ```bash
-npm install react-router-dom jspdf
+npm install react-router-dom jspdf axios
 ```
 
 ## Running the Application
 
-### On Linux/Mac:
+### Development Environment
+
+The project includes scripts for both Linux/Mac and Windows to easily set up and run the development environment:
+
+#### Linux/Mac (start-dev.sh)
+
+```bash
+# Basic usage
+./start-dev.sh
+
+# Show server output (verbose mode)
+./start-dev.sh --verbose
+
+# Skip dependency checks
+./start-dev.sh --skip-checks
+
+# Customize ports
+./start-dev.sh --backend-port 8000 --frontend-port 3001
+
+# Show all available options
+./start-dev.sh --help
+```
+
+#### Windows (start-windows.bat)
+
+```batch
+# Basic usage
+start-windows.bat
+
+# Show server output (verbose mode)
+start-windows.bat --verbose
+
+# Skip dependency checks
+start-windows.bat --skip-checks
+
+# Customize ports
+start-windows.bat --backend-port 8000 --frontend-port 3001
+
+# Show all available options
+start-windows.bat --help
+```
+
+Both scripts support the following options:
+- `-v, --verbose`: Display detailed output from servers
+- `-s, --skip-checks`: Skip dependency verification
+- `-bp, --backend-port`: Change backend server port (default: 5000)
+- `-fp, --frontend-port`: Change frontend server port (default: 3000)
+- `-h, --help`: Display help information
+
+The scripts will automatically:
+1. Verify Python, Node.js, and ffmpeg installations
+2. Create/activate a Python virtual environment
+3. Install required dependencies if needed
+4. Start the backend Flask server
+5. Start the React frontend server
+6. Provide URLs to access the application
+
+### Manual Setup
+
+If you prefer to start the services manually:
+
 ```bash
 # Start backend
 cd backend
@@ -85,6 +170,8 @@ python app.py
 cd frontend
 npm start
 ```
+
+After starting the application, access it in your browser at `http://localhost:3000`
 
 ### On Windows:
 Option 1: Use the provided batch script
@@ -159,7 +246,6 @@ gunicorn -w 4 app:app
 5. Set up Nginx as a reverse proxy
 
 ## Folder Structure
-## Project Folder Structure
 
 Below is an overview of the folder structure for the YouTube Video Transcriber project:
 
@@ -215,6 +301,14 @@ youtube-transcriber/
 7. **/api/load_model:** POST request to load a specific model
 8. **/api/logs/<job_id>:** GET request to retrieve job logs
 9. **/api/save_theme:** POST request to save theme settings
+10. **/api/regenerate_notes/<job_id>:** POST request to regenerate notes for a completed transcription
+11. **/api/clear_model_config:** POST request to reset model configuration to defaults
+12. **/api/auth/login:** POST request for user login
+13. **/api/auth/signup:** POST request for new user registration
+14. **/api/auth/logout:** POST request for user logout
+15. **/api/auth/check:** GET request to check authentication status
+16. **/api/export/notion:** POST request to export transcript and notes to Notion
+17. **/api/jobs/<job_id>:** DELETE request to delete a job and its data
 
 ## Notion Integration
 
