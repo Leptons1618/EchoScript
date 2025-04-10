@@ -149,29 +149,29 @@ if %SKIP_CHECKS%==1 (
 
 REM Check for virtual environment and set it up if needed
 call :log "STEP" "Setting up Python virtual environment..."
-if not exist "backend\venv" (
+if not exist "backend\.venv" (
     call :log "INFO" "Creating virtual environment..."
-    python -m venv backend\venv
+    python -m venv backend\.venv
     if %ERRORLEVEL% neq 0 (
         call :log "ERROR" "Failed to create virtual environment"
         exit /b 1
     )
-    call :log "SUCCESS" "Virtual environment created at backend\venv"
+    call :log "SUCCESS" "Virtual environment created at backend\.venv"
 )
 
 REM Install dependencies if needed
 if exist "backend\requirements.txt" (
     call :log "INFO" "Checking Python dependencies..."
-    if not exist "backend\venv\Scripts\pip.exe" (
+    if not exist "backend\.venv\Scripts\pip.exe" (
         call :log "ERROR" "Virtual environment seems corrupted, pip not found"
         exit /b 1
     )
     
     REM Check if flask is already installed
-    backend\venv\Scripts\pip.exe list | findstr "flask" >nul
+    backend\.venv\Scripts\pip.exe list | findstr "flask" >nul
     if %ERRORLEVEL% neq 0 (
         call :log "INFO" "Installing backend dependencies..."
-        backend\venv\Scripts\pip.exe install -r backend\requirements.txt
+        backend\.venv\Scripts\pip.exe install -r backend\requirements.txt
         if %ERRORLEVEL% neq 0 (
             call :log "ERROR" "Failed to install Python dependencies"
             exit /b 1
@@ -203,9 +203,9 @@ call :log "STEP" "Starting Flask backend server on port %BACKEND_PORT%..."
 set "FLASK_PORT=%BACKEND_PORT%"
 
 if %VERBOSE%==1 (
-    start cmd /k "cd backend && ..\backend\venv\Scripts\activate && python app.py"
+    start cmd /k "cd backend && ..\backend\.venv\Scripts\activate && python app.py"
 ) else (
-    start cmd /k "cd backend && ..\backend\venv\Scripts\activate && python app.py >nul 2>&1"
+    start cmd /k "cd backend && ..\backend\.venv\Scripts\activate && python app.py >nul 2>&1"
 )
 
 REM Wait for backend to initialize

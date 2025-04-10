@@ -180,25 +180,25 @@ setup_venv() {
   log "STEP" "Setting up Python virtual environment..."
   
   # Check if venv exists
-  if [[ ! -d "$BASE_DIR/backend/venv" ]]; then
+  if [[ ! -d "$BASE_DIR/backend/.venv" ]]; then
     log "INFO" "Creating virtual environment..."
-    python -m venv backend/venv || { 
+    python -m venv backend/.venv || { 
       log "ERROR" "Failed to create virtual environment" 
       return 1
     }
-    log "SUCCESS" "Virtual environment created at backend/venv"
+    log "SUCCESS" "Virtual environment created at backend/.venv"
   fi
   
   # Activate virtual environment
-  if [[ -f "$BASE_DIR/backend/venv/bin/activate" ]]; then
-    source "$BASE_DIR/backend/venv/bin/activate" || {
+  if [[ -f "$BASE_DIR/backend/.venv/bin/activate" ]]; then
+    source "$BASE_DIR/backend/.venv/bin/activate" || {
       log "ERROR" "Failed to activate virtual environment"
       return 1
     }
     log "SUCCESS" "Virtual environment activated"
-  elif [[ -f "$BASE_DIR/backend/venv/Scripts/activate" ]]; then
+  elif [[ -f "$BASE_DIR/backend/.venv/Scripts/activate" ]]; then
     # Windows with Git Bash or similar
-    source "$BASE_DIR/backend/venv/Scripts/activate" || {
+    source "$BASE_DIR/backend/.venv/Scripts/activate" || {
       log "ERROR" "Failed to activate virtual environment"
       return 1
     }

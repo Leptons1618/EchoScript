@@ -49,6 +49,7 @@ const Navbar = () => {
   // Determine if we're on login or signup page
   const isLoginPage = location.pathname === '/login';
   const isSignupPage = location.pathname === '/signup';
+  // eslint-disable-next-line no-unused-vars
   const isAuthPage = isLoginPage || isSignupPage;
 
   return (

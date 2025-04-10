@@ -296,7 +296,7 @@ const Home = () => {
     return pattern.test(url.trim());
   };
 
-  // Enhanced status rendering function - same as in JobsList for consistency
+  // eslint-disable-next-line no-unused-vars
   const renderStatus = (status) => {
     const statusClass = `status-text ${status.toLowerCase()}`;
     let statusText;
