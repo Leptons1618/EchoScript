@@ -1,6 +1,14 @@
-# YouTube Video Transcriber
+# YouTube Video Transcriber and Smart Note-Taker
 
-A full-featured application that transcribes YouTube videos, generates AI-powered notes, and provides synchronized video playback with interactive transcripts. Built with Python, Flask, and React.
+## Project Purpose
+
+This application serves as a comprehensive tool for transcribing YouTube videos and generating AI-powered notes and summaries. It provides synchronized playback with interactive transcripts, making it easy to navigate and review the content of a video. The project is designed to enhance productivity and learning by making it simple to capture, understand, and summarize video content.
+
+## Overview
+
+The YouTube Video Transcriber is a full-featured application designed to transcribe YouTube videos, generate AI-powered notes, and provide synchronized video playback with interactive transcripts. It is built using a robust combination of technologies, including Python, Flask, and React, to deliver a seamless and powerful user experience.
+
+## Key Features
 
 ## Features
 
